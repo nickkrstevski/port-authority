@@ -26,6 +26,53 @@ public enum PlugOrientation: Int, Codable, Sendable {
     case flipped = 2
 }
 
+/// Where a port physically sits on the machine.
+///
+/// Read from the `port-location` property that Apple puts on the `hpmN`
+/// device tree nodes, so this is the machine's own description of itself
+/// rather than a per-model table we would have to maintain.
+public enum PortLocation: String, Codable, Sendable {
+    case leftBack = "left-back"
+    case leftFront = "left-front"
+    case left = "left"
+    case rightBack = "right-back"
+    case rightFront = "right-front"
+    case right = "right"
+    case unknown = "unknown"
+
+    public enum Side: String, Codable, Sendable { case left, right, unknown }
+
+    public var side: Side {
+        switch self {
+        case .leftBack, .leftFront, .left: return .left
+        case .rightBack, .rightFront, .right: return .right
+        case .unknown: return .unknown
+        }
+    }
+
+    /// Ordering along that edge, front of the machine last.
+    public var rank: Int {
+        switch self {
+        case .leftBack, .rightBack: return 1
+        case .left, .right: return 1
+        case .leftFront, .rightFront: return 2
+        case .unknown: return 9
+        }
+    }
+
+    public var label: String {
+        switch self {
+        case .leftBack: return "Left, rear"
+        case .leftFront: return "Left, front"
+        case .left: return "Left"
+        case .rightBack: return "Right, rear"
+        case .rightFront: return "Right, front"
+        case .right: return "Right"
+        case .unknown: return "Unknown"
+        }
+    }
+}
+
 /// A power-capable port, built entirely from the IOAccessory registry plane.
 /// Everything here is available without entitlements or root.
 public struct PortInfo: Codable, Sendable, Identifiable {
@@ -36,6 +83,7 @@ public struct PortInfo: Codable, Sendable, Identifiable {
     public let kind: PortKind
     public let portNumber: Int
     public let builtIn: Bool
+    public let location: PortLocation
 
     /// The HPM controller instance backing this port. This is the join key
     /// between the registry and `hpmdiagnose` output.
@@ -60,7 +108,8 @@ public struct PortInfo: Codable, Sendable, Identifiable {
 
     public init(
         registryEntryID: UInt64, name: String, kind: PortKind, portNumber: Int,
-        builtIn: Bool, rid: Int?, connected: Bool, activeCable: Bool,
+        builtIn: Bool, location: PortLocation = .unknown,
+        rid: Int?, connected: Bool, activeCable: Bool,
         opticalCable: Bool, orientation: PlugOrientation, hpdAsserted: Bool,
         transportsSupported: [String], transportsActive: [String],
         pinConfiguration: [String: Int], plugEventCount: Int,
@@ -71,6 +120,7 @@ public struct PortInfo: Codable, Sendable, Identifiable {
         self.kind = kind
         self.portNumber = portNumber
         self.builtIn = builtIn
+        self.location = location
         self.rid = rid
         self.connected = connected
         self.activeCable = activeCable

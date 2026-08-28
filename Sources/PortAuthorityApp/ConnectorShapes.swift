@@ -30,21 +30,24 @@ enum Material {
         scheme == .dark ? Color.black.opacity(0.55) : Color.black.opacity(0.85)
     }
 
-    /// A flattened body seen from above: broad, nearly flat top face with the
-    /// form falling away only near the two long edges. Used for the plug
-    /// housing and strain relief.
+    /// A flat-topped moulding seen from above. The housing of a USB-C plug is
+    /// a slab with softened edges, not a barrel: almost the entire visible
+    /// face is one even tone, with a thin highlight near the upper edge and a
+    /// narrow shadow at the lower one. A broad specular through the middle is
+    /// what made this read as a cylindrical barrel jack.
     static func topFace(_ base: Color, scheme: ColorScheme, specular: Double? = nil) -> LinearGradient {
-        let gloss = specular ?? Material.gloss(scheme)
+        let gloss = (specular ?? Material.gloss(scheme)) * 0.42
         return LinearGradient(
             stops: [
-                .init(color: base.opacity(0.50), location: 0.00),
-                .init(color: base.opacity(0.86), location: 0.09),
-                .init(color: Color.white.opacity(gloss), location: 0.21),
-                .init(color: base, location: 0.34),
-                .init(color: base.opacity(0.95), location: 0.62),
-                .init(color: base.opacity(0.66), location: 0.82),
-                .init(color: edge(scheme).opacity(0.62), location: 0.94),
-                .init(color: edge(scheme), location: 1.00),
+                .init(color: edge(scheme).opacity(0.45), location: 0.000),
+                .init(color: base.opacity(0.80), location: 0.055),
+                .init(color: Color.white.opacity(gloss), location: 0.120),
+                .init(color: base.opacity(0.99), location: 0.220),
+                .init(color: base, location: 0.500),
+                .init(color: base.opacity(0.96), location: 0.760),
+                .init(color: base.opacity(0.78), location: 0.900),
+                .init(color: edge(scheme).opacity(0.45), location: 0.965),
+                .init(color: edge(scheme).opacity(0.85), location: 1.000),
             ],
             startPoint: .top, endPoint: .bottom
         )
@@ -126,6 +129,7 @@ struct TopDownPlug: View {
     let orientation: PlugOrientation
     let energised: Bool
     var dimmed: Bool = false
+    var heavyGauge: Bool = false
 
     @Environment(\.colorScheme) private var scheme
 
@@ -189,7 +193,7 @@ struct TopDownPlug: View {
     private var strainRelief: some View {
         Taper(
             leadingAcross: metrics.housingAcross * 0.76,
-            trailingAcross: PlugMetrics.cableAcross(heavyGauge: false) + 2
+            trailingAcross: PlugMetrics.cableAcross(heavyGauge: heavyGauge)
         )
         .fill(Material.topFace(body_, scheme: scheme, specular: Material.gloss(scheme) * 0.8))
         .overlay(ribs)
@@ -228,12 +232,11 @@ struct Taper: Shape {
     }
 }
 
-/// The laptop, seen from above: its top case fills the left of the diagram and
-/// runs off the edge of the panel, with the port cut into its outer wall.
+/// The machine's side wall, seen from above.
 ///
-/// The previous version was a narrow vertical bar, which reads as an edge seen
-/// side-on and made the whole scene look like a side elevation regardless of
-/// how the plug was drawn.
+/// Top and bottom fade out instead of ending in a hard edge: the laptop
+/// continues past the frame in both directions, and a finite slab read as a
+/// small block parked next to the plug rather than as the side of a machine.
 struct MachineBody: View {
     let portKind: PortKind
     var dimmed: Bool = false
@@ -246,36 +249,47 @@ struct MachineBody: View {
         ZStack(alignment: .trailing) {
             UnevenRoundedRectangle(
                 topLeadingRadius: 0, bottomLeadingRadius: 0,
-                bottomTrailingRadius: 9, topTrailingRadius: 9,
+                bottomTrailingRadius: 7, topTrailingRadius: 7,
                 style: .continuous
             )
             .fill(
                 LinearGradient(
                     stops: [
-                        .init(color: Material.aluminium.opacity(0.30), location: 0.00),
-                        .init(color: Material.aluminium.opacity(0.52), location: 0.30),
-                        .init(color: Material.aluminium.opacity(0.44), location: 0.72),
+                        .init(color: Material.aluminium.opacity(0.24), location: 0.00),
+                        .init(color: Material.aluminium.opacity(0.50), location: 0.40),
+                        .init(color: Material.aluminium.opacity(0.40), location: 0.78),
                         .init(color: Material.aluminium.opacity(0.22), location: 1.00),
                     ],
-                    startPoint: .top, endPoint: .bottom
+                    startPoint: .leading, endPoint: .trailing
                 )
             )
+            // The machined chamfer along the outer edge, catching light.
+            .overlay(alignment: .trailing) {
+                LinearGradient(
+                    colors: [Color.white.opacity(0.06), Color.white.opacity(0.34), Color.white.opacity(0.06)],
+                    startPoint: .top, endPoint: .bottom
+                )
+                .frame(width: 1.2)
+            }
 
-            // Chamfered outer edge catching the light.
-            UnevenRoundedRectangle(
-                topLeadingRadius: 0, bottomLeadingRadius: 0,
-                bottomTrailingRadius: 9, topTrailingRadius: 9,
-                style: .continuous
-            )
-            .strokeBorder(Color.white.opacity(0.22), lineWidth: 1)
-
-            // The port cut into the outer wall, mostly hidden by the plug.
+            // The port cut into the wall, mostly filled by the plug.
             RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(Color.black.opacity(0.62))
-                .frame(width: 8, height: slotAcross)
+                .fill(Color.black.opacity(0.66))
+                .frame(width: 9, height: slotAcross)
                 .offset(x: 1)
         }
-        .frame(width: 40, height: 84)
+        .frame(width: 40, height: 132)
+        .mask(
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0.00),
+                    .init(color: .black, location: 0.30),
+                    .init(color: .black, location: 0.70),
+                    .init(color: .clear, location: 1.00),
+                ],
+                startPoint: .top, endPoint: .bottom
+            )
+        )
         .opacity(dimmed ? 0.5 : 1)
     }
 }

@@ -42,12 +42,15 @@ public enum PortEnumerator {
         var entryID: UInt64 = 0
         IORegistryEntryGetRegistryEntryID(service, &entryID)
 
+        let kind = PortKind(portTypeDescription: props["PortTypeDescription"] as? String)
+
         return PortInfo(
             registryEntryID: entryID,
             name: name,
-            kind: PortKind(portTypeDescription: props["PortTypeDescription"] as? String),
+            kind: kind,
             portNumber: props["PortNumber"] as? Int ?? 0,
             builtIn: props["BuiltIn"] as? Bool ?? false,
+            location: portLocation(of: service, kind: kind),
             rid: searchParents(service, for: "RID") as? Int,
             connected: props["ConnectionActive"] as? Bool ?? false,
             activeCable: props["ActiveCable"] as? Bool ?? false,
@@ -62,6 +65,24 @@ public enum PortEnumerator {
             connectionCount: props["ConnectionCount"] as? Int ?? 0,
             liquidDetected: props["LDCM_LiquidDetected"] as? Bool
         )
+    }
+
+    /// `port-location` lives on the hpmN device tree node above the port, as
+    /// a null-terminated string in a data blob.
+    private static func portLocation(of service: io_service_t, kind: PortKind) -> PortLocation {
+        if let raw = searchParents(service, for: "port-location") {
+            var text: String?
+            if let data = raw as? Data {
+                text = String(decoding: data.prefix(while: { $0 != 0 }), as: UTF8.self)
+            } else if let string = raw as? String {
+                text = string
+            }
+            if let text, let location = PortLocation(rawValue: text) { return location }
+        }
+        // MagSafe carries no port-location. On every Mac that has one it is
+        // the rearmost port on the left side, so that is the only assumption
+        // made here -- and only for MagSafe.
+        return kind == .magSafe ? .left : .unknown
     }
 
     static func properties(of service: io_service_t) -> [String: Any]? {

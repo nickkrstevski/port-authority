@@ -4,6 +4,15 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var model: AppModel
 
+    /// Details list vs power trace. Kept here rather than in the model: it is
+    /// a view preference, not device state.
+    @State private var showChart: Bool
+
+    init(model: AppModel, initialShowChart: Bool = false) {
+        self.model = model
+        _showChart = State(initialValue: initialShowChart)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             summary
@@ -14,7 +23,15 @@ struct ContentView: View {
                     adapter: model.adapter,
                     liveWatts: liveWatts(for: selected)
                 )
-                details(for: selected)
+                if selected.port.connected { modeToggle }
+                if showChart {
+                    PowerChart(
+                        trace: model.trace(for: selected.id) ?? PowerTrace(),
+                        contract: selected.contract
+                    )
+                } else {
+                    details(for: selected)
+                }
             }
             footer
         }
@@ -80,31 +97,34 @@ struct ContentView: View {
         }
     }
 
+    /// The machine with its real port layout, alongside a description of
+    /// whichever port is selected.
     private var portPicker: some View {
-        HStack(spacing: 5) {
-            ForEach(model.ports) { entry in
-                let isSelected = model.selectedPort?.id == entry.id
-                Button {
-                    model.select(portID: entry.id)
-                } label: {
+        HStack(alignment: .center, spacing: 15) {
+            MachineMap(
+                ports: model.ports,
+                selectedID: model.selectedPort?.id,
+                onSelect: { model.select(portID: $0) }
+            )
+
+            if let selected = model.selectedPort {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(shortName(selected.port))
+                        .font(.system(size: 12, weight: .semibold))
+                    Text(selected.port.location.label)
+                        .readout(10)
+                        .foregroundStyle(.secondary)
                     HStack(spacing: 4) {
                         Circle()
-                            .fill(entry.port.connected ? Theme.live : Theme.idle)
+                            .fill(selected.port.connected ? Theme.live : Theme.idle)
                             .frame(width: 5, height: 5)
-                        Text(shortName(entry.port))
-                            .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                        Text(selected.port.connected ? "Connected" : "Empty")
+                            .readout(10)
+                            .foregroundStyle(.secondary)
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .frame(maxWidth: .infinity)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(isSelected ? Color.primary.opacity(0.11) : Color.clear)
-                    )
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
             }
+            Spacer(minLength: 0)
         }
     }
 
@@ -133,10 +153,10 @@ struct ContentView: View {
     private func cableSection(_ cable: CableProfile, port: PortInfo) -> some View {
         section("Cable") {
             detailRow("Construction", cable.construction.rawValue)
-            if let rating = cable.currentRatingLabel {
-                // Say plainly that this is deduced: a sink never reads the
-                // cable's e-marker, so this is a floor, not a nameplate.
-                detailRow("Current rating", rating, note: cable.ratingInferred ? "from contract" : nil)
+            if let rating = cable.currentRating {
+                // The basis is shown alongside: a sink never reads the cable's
+                // e-marker, so this is deduced, never read off the cable.
+                detailRow("Rated for", rating.label, note: rating.basis)
             }
             detailRow("Data", cable.data.rawValue)
             if cable.activeLanes > 0 {
@@ -220,6 +240,44 @@ struct ContentView: View {
         }
     }
 
+    /// Morphs between the list and plot glyphs on tap. SF Symbols' replace
+    /// transition does the interpolation, so the two icons swap as one mark
+    /// rather than cross-fading.
+    private var modeToggle: some View {
+        HStack {
+            Button {
+                withAnimation(.snappy(duration: 0.28)) { showChart.toggle() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: showChart ? "chart.xyaxis.line" : "list.bullet")
+                        .contentTransition(.symbolEffect(.replace.downUp))
+                        .font(.system(size: 11, weight: .semibold))
+                        .frame(width: 14)
+                    Text(showChart ? "Trace" : "Details")
+                        .font(.system(size: 10, weight: .medium))
+                        .contentTransition(.numericText())
+                }
+                .padding(.horizontal, 9)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule().fill(Color.primary.opacity(0.09))
+                )
+                .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .help(showChart ? "Show details" : "Show power trace")
+
+            Spacer()
+
+            if showChart, let selected = model.selectedPort,
+               let trace = model.trace(for: selected.id), trace.duration > 0 {
+                Text("since plugged in · \(PowerChart.clock(trace.duration))")
+                    .readout(9)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+    }
+
     private var footer: some View {
         HStack {
             if model.snapshot?.registersAvailable == false {
@@ -246,6 +304,10 @@ struct ConnectionDiagram: View {
     private var energised: Bool { connected && (liveWatts ?? 0) > 0.5 }
 
     /// How hard the cable is working relative to what was negotiated.
+    private var heavyGauge: Bool {
+        (snapshot.contract?.request?.operatingAmps ?? 0) > 3.0
+    }
+
     private var intensity: Double {
         guard let liveWatts, let ceiling = snapshot.contract?.contractWatts, ceiling > 0 else { return 0 }
         return min(1, liveWatts / ceiling)
@@ -264,17 +326,21 @@ struct ConnectionDiagram: View {
                 kind: snapshot.port.kind,
                 orientation: connected ? snapshot.port.orientation : .unknown,
                 energised: energised,
-                dimmed: !connected
+                dimmed: !connected,
+                heavyGauge: heavyGauge
             )
 
             CableView(
                 energised: energised,
                 intensity: intensity,
-                heavyGauge: (snapshot.contract?.request?.operatingAmps ?? 0) > 3.0,
+                heavyGauge: heavyGauge,
                 dimmed: !connected
             )
             .frame(minWidth: 30)
             .layoutPriority(1)
+            // Tuck under the strain relief so the wire meets the plug with no
+            // seam between them.
+            .padding(.leading, -4)
 
             endpoint
         }

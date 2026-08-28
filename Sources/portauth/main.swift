@@ -24,7 +24,7 @@ case "status":
     for entry in snapshot.ports {
         let port = entry.port
         let state = port.connected ? "connected" : "empty"
-        print("\(port.name)  [\(state)]")
+        print("\(port.name)  [\(state)]  location: \(port.location.label) (\(port.location.rawValue))")
         guard port.connected else { continue }
 
         print("    orientation  \(port.orientation)   cable  \(port.activeCable ? "active" : "passive")\(port.opticalCable ? ", optical" : "")")

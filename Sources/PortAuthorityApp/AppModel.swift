@@ -19,6 +19,11 @@ final class AppModel: ObservableObject {
     /// refresh to catch renegotiations (PPS, or a second device sharing).
     private let registerRefreshInterval: TimeInterval = 30
 
+    /// Power traces per port, restarted whenever a cable goes in.
+    @Published private(set) var traces: [UInt64: PowerTrace] = [:]
+    private var sessionStart: [UInt64: Date] = [:]
+    private var lastPlugEvent: [UInt64: Int] = [:]
+
     private var timer: Timer?
     private var lastConnectionFingerprint: String = ""
     private var lastRegisterRefresh: Date = .distantPast
@@ -45,7 +50,8 @@ final class AppModel: ObservableObject {
     init() {}
 
     /// Seeds a fixed state for offline rendering; no timers, no hardware.
-    init(preview: SystemSnapshot) {
+    init(preview: SystemSnapshot, traces: [UInt64: PowerTrace] = [:]) {
+        self.traces = traces
         self.snapshot = preview
         self.selectedPortID = preview.ports.first(where: \.port.connected)?.id
             ?? preview.ports.first?.id
@@ -118,8 +124,46 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func trace(for id: UInt64) -> PowerTrace? { traces[id] }
+
+    /// Records one point per refresh for every port holding a contract, and
+    /// resets a port's trace when its cable is pulled or replugged.
+    private func recordTraces(_ fresh: SystemSnapshot) {
+        let now = Date()
+        for entry in fresh.ports {
+            let id = entry.port.registryEntryID
+
+            let replugged = lastPlugEvent[id] != nil
+                && lastPlugEvent[id] != entry.port.plugEventCount
+            lastPlugEvent[id] = entry.port.plugEventCount
+
+            guard entry.port.connected, let contract = entry.contract else {
+                traces[id] = nil
+                sessionStart[id] = nil
+                continue
+            }
+
+            if sessionStart[id] == nil || replugged {
+                sessionStart[id] = now
+                traces[id] = PowerTrace()
+            }
+
+            guard let start = sessionStart[id],
+                  let volts = contract.contractVolts,
+                  let watts = fresh.adapter.adapterWatts
+            else { continue }
+
+            var trace = traces[id] ?? PowerTrace()
+            trace.append(
+                PowerSample(elapsed: now.timeIntervalSince(start), watts: watts, volts: volts)
+            )
+            traces[id] = trace
+        }
+    }
+
     private func apply(_ fresh: SystemSnapshot, previous: SystemSnapshot?) {
         snapshot = fresh
+        recordTraces(fresh)
 
         guard let id = selectedPortID,
               fresh.ports.contains(where: { $0.id == id })

@@ -26,20 +26,41 @@ public struct CableProfile: Codable, Sendable, Equatable {
 
     public let construction: Construction
     public let data: DataCapability
-    /// Lower bound on the conductor rating, in amps, or nil if unknown.
-    public let minimumCurrentRating: Double?
-    /// True when the rating was inferred from the contract rather than read.
-    public let ratingInferred: Bool
+    /// USB-C cable current ratings are not a continuum. The Cable VDO encodes
+    /// exactly two legal values, 3A and 5A, so a cable is one or the other.
+    public enum CurrentRating: String, Codable, Sendable {
+        /// Proven: the contract exceeds 3A, which is only permitted over a
+        /// 5A e-marked cable, so this cable is certainly the 5A kind.
+        case fiveAmp
+        /// Undetermined. Every USB-C cable is good for at least 3A, and a 5A
+        /// cable carrying 2A is indistinguishable from a 3A one, so at this
+        /// load the two cannot be told apart.
+        case undetermined
+
+        public var label: String {
+            switch self {
+            case .fiveAmp: return "5A"
+            case .undetermined: return "3A or 5A"
+            }
+        }
+
+        /// Why we believe it, shown next to the value so the value is never
+        /// mistaken for something read off the cable.
+        public var basis: String {
+            switch self {
+            case .fiveAmp: return "e-marked, from contract"
+            case .undetermined: return "not distinguishable at this load"
+            }
+        }
+    }
+
+    public let currentRating: CurrentRating?
     public let carriesDisplay: Bool
     public let displayAttached: Bool
     /// High-speed lanes with a pin assignment, out of four.
     public let activeLanes: Int
 
-    public var currentRatingLabel: String? {
-        guard let amps = minimumCurrentRating else { return nil }
-        let value = amps == amps.rounded() ? String(Int(amps)) : String(format: "%.1f", amps)
-        return ratingInferred ? "\(value)A min" : "\(value)A"
-    }
+    public var currentRatingLabel: String? { currentRating?.label }
 
     public var summary: String {
         var parts = [construction.rawValue]
@@ -77,17 +98,14 @@ public struct CableProfile: Codable, Sendable, Equatable {
         carriesDisplay = transports.contains("DisplayPort")
         displayAttached = port.hpdAsserted
 
-        // A contract above 3A is only permitted over an e-marked 5A cable, so
-        // the negotiated current puts a floor under the cable's rating.
+        // Above 3A the cable must be the 5A e-marked kind; at or below it,
+        // the two ratings behave identically and cannot be separated.
         if let amps = contract?.request?.operatingAmps, amps > 3.0 {
-            minimumCurrentRating = 5
-            ratingInferred = true
+            currentRating = .fiveAmp
         } else if contract != nil {
-            minimumCurrentRating = 3
-            ratingInferred = true
+            currentRating = .undetermined
         } else {
-            minimumCurrentRating = nil
-            ratingInferred = false
+            currentRating = nil
         }
 
         let lanes = ["tx1", "tx2", "rx1", "rx2"]
