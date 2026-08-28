@@ -75,6 +75,7 @@ enum PreviewRenderer {
         [
             ("charging-right", chargingSnapshot()),
             ("charging-left", chargingSnapshot(onLeft: true)),
+            ("magsafe", magSafeSnapshot()),
             ("empty-port", emptySnapshot()),
         ]
     }
@@ -127,6 +128,34 @@ enum PreviewRenderer {
             adapter: AdapterState(
                 adapterWatts: 85.37, systemWatts: 19.82, ratedWatts: 100,
                 voltageMillivolts: 20000, currentMilliamps: 5000,
+                description: "pd charger", isCharging: true
+            ),
+            registersAvailable: true, registerError: nil
+        )
+    }
+
+    /// MagSafe charging, to check the wedge render.
+    private static func magSafeSnapshot() -> SystemSnapshot {
+        let caps: [PowerDataObject] = [
+            .fixed(volts: 5, maxAmps: 3, unconstrained: true, eprCapable: false),
+            .fixed(volts: 9, maxAmps: 3, unconstrained: true, eprCapable: false),
+            .fixed(volts: 20, maxAmps: 4.7, unconstrained: true, eprCapable: false),
+        ]
+        let request = RequestDataObject(raw: 0x338759D6)
+        let contract = PDContract(sourceCapabilities: caps, request: request, activePDO: caps[2])
+        return SystemSnapshot(
+            ports: [
+                PortSnapshot(port: port(id: 1, number: 1, kind: .usbC, connected: false, location: .leftBack), contract: nil),
+                PortSnapshot(port: port(id: 2, number: 2, kind: .usbC, connected: false, location: .leftFront), contract: nil),
+                PortSnapshot(port: port(id: 3, number: 3, kind: .usbC, connected: false, location: .right), contract: nil),
+                PortSnapshot(
+                    port: port(id: 4, number: 1, kind: .magSafe, connected: true, location: .left),
+                    contract: contract
+                ),
+            ],
+            adapter: AdapterState(
+                adapterWatts: 71.2, systemWatts: 18.0, ratedWatts: 96,
+                voltageMillivolts: 20000, currentMilliamps: 4700,
                 description: "pd charger", isCharging: true
             ),
             registersAvailable: true, registerError: nil

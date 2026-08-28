@@ -108,10 +108,12 @@ struct PlugMetrics {
             // the widest part and the cable leaves it almost immediately, so
             // the "housing" section is drawn narrower than the head rather
             // than wider.
+            // 13.21mm across the contact face, 18.78mm long overall, split
+            // here into the two segments the drawing uses.
             return PlugMetrics(
-                shellAcross: 13.21 * scale, shellLong: 10.0 * scale, shellRadius: 1.6 * scale,
-                housingAcross: 9.5 * scale, housingLong: 8.8 * scale,
-                reliefLong: 5.0 * scale
+                shellAcross: 13.21 * scale, shellLong: 9.4 * scale, shellRadius: 1.6 * scale,
+                housingAcross: 9.5 * scale, housingLong: 9.4 * scale,
+                reliefLong: 0
             )
         case .usbC, .unknown:
             return PlugMetrics(
@@ -143,15 +145,57 @@ struct TopDownPlug: View {
     private var body_: Color { Material.cable(scheme) }
 
     var body: some View {
-        HStack(spacing: -3) {
-            shell
-            housing.zIndex(2)
-            strainRelief.zIndex(1)
+        Group {
+            if kind == .magSafe {
+                magSafeBody
+            } else {
+                HStack(spacing: -3) {
+                    shell
+                    housing.zIndex(2)
+                    strainRelief.zIndex(1)
+                }
+            }
         }
         .frame(height: 42)
         .shadow(color: .black.opacity(dimmed ? 0.14 : 0.42), radius: 3.5, x: 0, y: 3)
         .saturation(dimmed ? 0 : 1)
         .opacity(dimmed ? 0.4 : 1)
+    }
+
+    /// MagSafe 3 is a tapered aluminium wedge, widest at the contact face and
+    /// narrowing back to where the braid enters. It has no plastic overmold
+    /// and no strain relief -- drawing it with USB-C's anatomy was the error.
+    /// Reference: close-up photograph of the connector.
+    private var magSafeBody: some View {
+        let metrics = self.metrics
+        let tip = metrics.shellAcross
+        // The real wedge narrows toward the braid but does not come to a
+        // point; too much taper reads as a funnel.
+        let tail = PlugMetrics.cableAcross(heavyGauge: false) + 5.5
+
+        return ZStack(alignment: .leading) {
+            Taper(leadingAcross: tip, trailingAcross: tail)
+                .fill(Material.topFace(Material.aluminium, scheme: scheme, specular: 0.85))
+                .overlay(
+                    Taper(leadingAcross: tip, trailingAcross: tail)
+                        .stroke(Color.black.opacity(0.30), lineWidth: 0.7)
+                )
+
+            // Rounded bezel around the contact face at the tip.
+            RoundedRectangle(cornerRadius: 1.6, style: .continuous)
+                .strokeBorder(Color.black.opacity(0.28), lineWidth: 0.9)
+                .frame(width: 3, height: tip - 2)
+                .padding(.leading, 1)
+
+            // The status LED, which sits on the top face near the tip.
+            Circle()
+                .fill(energised ? Theme.live : Color.white.opacity(0.75))
+                .frame(width: 3.2, height: 3.2)
+                .shadow(color: energised ? Theme.live.opacity(0.9) : .clear, radius: 4)
+                .padding(.leading, metrics.shellLong * 0.55)
+        }
+        .frame(width: metrics.shellLong + metrics.housingLong, height: tip)
+        .shadow(color: energised ? Theme.live.opacity(0.35) : .clear, radius: 6)
     }
 
     private var shell: some View {

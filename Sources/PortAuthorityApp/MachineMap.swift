@@ -24,12 +24,11 @@ struct MachineMap: View {
     private var caseTop: Color {
         scheme == .dark ? Color(white: 0.30) : Color(white: 0.78)
     }
-    private var wellColor: Color {
-        scheme == .dark ? Color(white: 0.14) : Color(white: 0.62)
-    }
-    private var keyColor: Color {
-        scheme == .dark ? Color(white: 0.22) : Color(white: 0.88)
-    }
+    /// The keyboard well is markedly darker than the case in life -- close to
+    /// black even on a silver machine -- which is most of what makes the top
+    /// case read correctly.
+    private var wellColor: Color { Color(white: scheme == .dark ? 0.07 : 0.16) }
+    private var keyColor: Color { Color(white: scheme == .dark ? 0.17 : 0.26) }
 
     var body: some View {
         ZStack {
@@ -63,6 +62,13 @@ struct MachineMap: View {
                     .frame(width: drawnWidth * 0.58, height: 1.6)
                     .padding(.top, mm(8))
             }
+            .overlay(alignment: .bottom) {
+                // Finger recess in the front edge, for opening the lid.
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                    .fill(Color.black.opacity(scheme == .dark ? 0.45 : 0.22))
+                    .frame(width: mm(60), height: mm(4))
+                    .offset(y: mm(1.5))
+            }
             .shadow(color: .black.opacity(0.35), radius: 4, y: 2)
     }
 
@@ -71,6 +77,10 @@ struct MachineMap: View {
     /// Relative key widths per row, in units of one standard key. This is the
     /// real ANSI Mac layout rather than an even grid, which is most of what
     /// makes a keyboard read as a keyboard.
+    /// The function row is half height on a real keyboard; every other row is
+    /// full. Drawing them all equal was the giveaway.
+    private static let rowHeights: [Double] = [0.62, 1, 1, 1, 1, 1]
+
     private static let keyRows: [[Double]] = [
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.5],
@@ -84,17 +94,18 @@ struct MachineMap: View {
         let width = mm(MachineGeometry.keyboardWidth)
         let depth = mm(MachineGeometry.keyboardDepth)
         let rowGap: CGFloat = 1.0
-        let rowHeight = (depth - rowGap * CGFloat(Self.keyRows.count - 1)) / CGFloat(Self.keyRows.count)
+        let units = Self.rowHeights.reduce(0, +)
+        let unit = (depth - 5 - rowGap * CGFloat(Self.keyRows.count - 1)) / CGFloat(units)
 
         return VStack(spacing: rowGap) {
-            ForEach(Array(Self.keyRows.enumerated()), id: \.offset) { _, row in
-                keyRow(row, width: width, height: rowHeight)
+            ForEach(Array(Self.keyRows.enumerated()), id: \.offset) { index, row in
+                keyRow(row, width: width, height: unit * CGFloat(Self.rowHeights[index]))
             }
         }
-        .padding(2)
+        .padding(2.5)
         .background(
-            RoundedRectangle(cornerRadius: 2.5, style: .continuous)
-                .fill(wellColor.opacity(0.75))
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(wellColor)
         )
         .frame(width: width, height: depth)
         .position(x: drawnWidth / 2, y: mm(MachineGeometry.keyboardFromRear) + depth / 2)
@@ -142,7 +153,7 @@ struct MachineMap: View {
                     context.fill(
                         Path(ellipseIn: CGRect(x: x - radius, y: y - radius,
                                                width: radius * 2, height: radius * 2)),
-                        with: .color(Color.primary.opacity(0.20))
+                        with: .color(Color.primary.opacity(0.28))
                     )
                     x += pitch
                 }
@@ -163,7 +174,8 @@ struct MachineMap: View {
             .frame(width: mm(MachineGeometry.trackpadWidth), height: mm(MachineGeometry.trackpadDepth))
             .position(
                 x: drawnWidth / 2,
-                y: drawnDepth - mm(MachineGeometry.trackpadDepth) / 2 - mm(12)
+                y: mm(MachineGeometry.keyboardFromRear + MachineGeometry.keyboardDepth)
+                    + mm(MachineGeometry.trackpadDepth) / 2 + mm(6)
             )
     }
 

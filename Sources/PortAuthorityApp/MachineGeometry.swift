@@ -108,10 +108,16 @@ enum MachineGeometry {
 
     /// Keyboard well, trackpad and speaker grilles. All [ESTIMATE], scaled to
     /// look right against the body rather than measured.
-    static let keyboardWidth: Double = 250
-    static let keyboardDepth: Double = 96
-    static let keyboardFromRear: Double = 52
+    /// Proportions taken off a photograph of the real top case: the keyboard
+    /// well spans about 0.70 of the body width and sits close under the
+    /// hinge, with the speaker grilles filling the aluminium either side and
+    /// the trackpad directly beneath. Horizontal fractions are reliable from
+    /// a photo; depths are foreshortened by the camera angle, so the trackpad
+    /// is set from its known ~130x80mm size instead.
+    static let keyboardWidth: Double = 219
+    static let keyboardDepth: Double = 88
+    static let keyboardFromRear: Double = 22
     static let trackpadWidth: Double = 130
-    static let trackpadDepth: Double = 82
-    static let speakerWidth: Double = 26
+    static let trackpadDepth: Double = 80
+    static let speakerWidth: Double = 22
 }
