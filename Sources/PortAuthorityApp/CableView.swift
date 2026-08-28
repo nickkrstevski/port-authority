@@ -8,8 +8,9 @@ struct CableView: View {
     let intensity: Double
     /// Passive 3A cables are drawn thinner than 5A / e-marked ones.
     let heavyGauge: Bool
+    var dimmed: Bool = false
 
-    private var thickness: CGFloat { heavyGauge ? 13 : 9 }
+    private var thickness: CGFloat { heavyGauge ? 17 : 12 }
 
     var body: some View {
         GeometryReader { geometry in
@@ -38,6 +39,8 @@ struct CableView: View {
             .frame(height: geometry.size.height, alignment: .center)
         }
         .frame(height: thickness)
+        .saturation(dimmed ? 0 : 1)
+        .opacity(dimmed ? 0.4 : 1)
     }
 
     /// Dots travel right-to-left: power flows from the source into the machine,

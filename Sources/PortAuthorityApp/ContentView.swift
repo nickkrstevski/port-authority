@@ -132,8 +132,6 @@ struct ContentView: View {
                 if snapshot.contract?.supportsPPS == true {
                     detailRow("PPS", "Supported")
                 }
-            } else {
-                detailRow("Status", "Nothing connected")
             }
             if port.liquidDetected == true {
                 detailRow("Liquid", "Detected")
@@ -178,51 +176,69 @@ struct ContentView: View {
     }
 }
 
-/// chassis -> connector -> cable -> source, left to right.
+/// chassis -> plug -> cable -> source, left to right, seen from above.
 struct ConnectionDiagram: View {
     let snapshot: PortSnapshot
     let adapter: AdapterState
     let liveWatts: Double?
 
-    private var energised: Bool { (liveWatts ?? 0) > 0.5 }
+    private var connected: Bool { snapshot.port.connected }
+    private var energised: Bool { connected && (liveWatts ?? 0) > 0.5 }
 
+    /// How hard the cable is working relative to what was negotiated.
     private var intensity: Double {
         guard let liveWatts, let ceiling = snapshot.contract?.contractWatts, ceiling > 0 else { return 0 }
         return min(1, liveWatts / ceiling)
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            ChassisEdge()
-            if snapshot.port.connected {
-                ConnectorView(
-                    kind: snapshot.port.kind,
-                    orientation: snapshot.port.orientation,
-                    energised: energised
-                )
-                CableView(
-                    energised: energised,
-                    intensity: intensity,
-                    heavyGauge: (snapshot.contract?.request?.operatingAmps ?? 0) > 3.0
-                )
-                .frame(minWidth: 26)
+        HStack(alignment: .center, spacing: 0) {
+            ChassisEdge(dimmed: !connected)
 
-                if snapshot.contract != nil {
-                    BrickView(contract: snapshot.contract, adapter: adapter, liveWatts: liveWatts)
-                } else {
-                    PassiveEndView(transports: snapshot.port.transportsActive)
-                }
-            } else {
-                ConnectorView(kind: snapshot.port.kind, orientation: .unknown, energised: false)
-                    .opacity(0.4)
-                Spacer()
-                Text("Empty")
-                    .readout(11)
-                    .foregroundStyle(.tertiary)
-                    .frame(width: 172)
-            }
+            if !connected { Spacer().frame(width: 14) }
+
+            // An unplugged port still draws the whole assembly, greyed out and
+            // pulled clear of the chassis, so the panel keeps its shape and
+            // the port reads as "empty" rather than "broken".
+            TopDownPlug(
+                kind: snapshot.port.kind,
+                orientation: connected ? snapshot.port.orientation : .unknown,
+                energised: energised,
+                dimmed: !connected
+            )
+
+            CableView(
+                energised: energised,
+                intensity: intensity,
+                heavyGauge: (snapshot.contract?.request?.operatingAmps ?? 0) > 3.0,
+                dimmed: !connected
+            )
+            .frame(minWidth: 34)
+            .layoutPriority(1)
+
+            endpoint
         }
-        .frame(height: 116)
-        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 6)
+        .animation(.easeInOut(duration: 0.25), value: connected)
+    }
+
+    @ViewBuilder
+    private var endpoint: some View {
+        if !connected {
+            EmptyEndView(portName: shortLabel)
+        } else if snapshot.contract != nil {
+            BrickView(contract: snapshot.contract, adapter: adapter, liveWatts: liveWatts)
+        } else {
+            PassiveEndView(transports: snapshot.port.transportsActive)
+        }
+    }
+
+    private var shortLabel: String {
+        switch snapshot.port.kind {
+        case .usbC: return "USB-C \(snapshot.port.portNumber)"
+        case .magSafe: return "MagSafe"
+        case .unknown: return snapshot.port.name
+        }
     }
 }

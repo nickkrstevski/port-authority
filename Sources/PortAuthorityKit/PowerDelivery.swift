@@ -143,6 +143,16 @@ public struct PDContract: Codable, Sendable, Equatable {
         sourceCapabilities.map(\.maxWatts).max()
     }
 
+    public init(
+        sourceCapabilities: [PowerDataObject],
+        request: RequestDataObject?,
+        activePDO: PowerDataObject?
+    ) {
+        self.sourceCapabilities = sourceCapabilities
+        self.request = request
+        self.activePDO = activePDO
+    }
+
     public var supportsPPS: Bool {
         sourceCapabilities.contains { $0.isProgrammable }
     }

@@ -7,8 +7,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var snapshot: SystemSnapshot?
     @Published var selectedPortID: UInt64?
 
-    /// Registry and battery reads are cheap, so they run on a short cycle.
-    private let fastInterval: TimeInterval = 2
+    /// Registry and battery reads are cheap, so wattage updates at 1Hz.
+    private let fastInterval: TimeInterval = 1
     /// A full hpmdiagnose dump costs about a second of I2C traffic, so it
     /// runs only when the set of connected ports changes, plus a slow
     /// refresh to catch renegotiations (PPS, or a second device sharing).
@@ -29,6 +29,15 @@ final class AppModel: ObservableObject {
     /// Prefer showing something live: the first connected port, else the first.
     private var defaultPort: PortSnapshot? {
         ports.first(where: \.port.connected) ?? ports.first
+    }
+
+    init() {}
+
+    /// Seeds a fixed state for offline rendering; no timers, no hardware.
+    init(preview: SystemSnapshot) {
+        self.snapshot = preview
+        self.selectedPortID = preview.ports.first(where: \.port.connected)?.id
+            ?? preview.ports.first?.id
     }
 
     func start() {

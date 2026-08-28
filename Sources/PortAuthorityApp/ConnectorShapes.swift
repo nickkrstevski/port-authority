@@ -1,99 +1,137 @@
 import PortAuthorityKit
 import SwiftUI
 
-/// The laptop-side connector, drawn face-on as it would look plugged in.
-struct ConnectorView: View {
+/// The plug seen from above: contact tip at the left, pointing into the
+/// machine, with the overmold and strain relief stepping down toward the
+/// cable on the right.
+///
+/// The sections butt together with a small negative overlap so their rounded
+/// corners merge into one silhouette instead of showing seams.
+struct TopDownPlug: View {
     let kind: PortKind
     let orientation: PlugOrientation
     let energised: Bool
+    var dimmed: Bool = false
 
     var body: some View {
-        switch kind {
-        case .usbC: usbC
-        case .magSafe: magSafe
-        case .unknown: unknownPort
+        HStack(spacing: -5) {
+            tip
+            overmold.zIndex(1)
+            strainRelief
         }
+        .frame(height: 34)
+        .saturation(dimmed ? 0 : 1)
+        .opacity(dimmed ? 0.45 : 1)
     }
 
-    private var shellStroke: Color { energised ? Theme.metal : Theme.metal.opacity(0.55) }
+    // MARK: sections
 
-    private var usbC: some View {
-        // Outer shell is a true stadium; the tongue sits slightly off-centre
-        // so a flipped cable is actually visible rather than implied.
-        ZStack {
-            Capsule()
-                .fill(
-                    LinearGradient(
-                        colors: [Color.black.opacity(0.55), Color.black.opacity(0.25)],
-                        startPoint: .top, endPoint: .bottom
-                    )
+    /// The metal shell that actually enters the port. Rounded to a stadium at
+    /// the leading edge; the vertical gradient reads as a cylindrical body.
+    private var tip: some View {
+        let size = tipSize
+        return RoundedRectangle(cornerRadius: size.height / 2, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Theme.metal.opacity(0.95),
+                        Theme.metal.opacity(0.55),
+                        Theme.metal.opacity(0.8),
+                    ],
+                    startPoint: .top, endPoint: .bottom
                 )
-                .overlay(Capsule().strokeBorder(shellStroke, lineWidth: 1.4))
-
-            Capsule()
-                .fill(Theme.contact.opacity(energised ? 0.85 : 0.4))
-                .frame(width: 30, height: 4)
-                .offset(y: tongueOffset)
-        }
-        .frame(width: 48, height: 17)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: size.height / 2, style: .continuous)
+                    .strokeBorder(Color.black.opacity(0.35), lineWidth: 0.75)
+            )
+            .frame(width: size.width, height: size.height)
+            .shadow(color: energised ? Theme.live.opacity(0.5) : .clear, radius: 5)
     }
 
-    private var tongueOffset: CGFloat {
-        switch orientation {
-        case .normal: return -2.5
-        case .flipped: return 2.5
-        case .unknown: return 0
+    private var tipSize: CGSize {
+        switch kind {
+        case .usbC: return CGSize(width: 34, height: 17)
+        case .magSafe: return CGSize(width: 19, height: 25)
+        case .unknown: return CGSize(width: 28, height: 17)
         }
     }
 
-    private var magSafe: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+    /// The moulded housing you actually hold.
+    private var overmold: some View {
+        ZStack(alignment: orientationAlignment) {
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
                 .fill(
                     LinearGradient(
-                        colors: [Color.black.opacity(0.5), Color.black.opacity(0.22)],
+                        colors: [Color.white.opacity(0.20), Color.black.opacity(0.55)],
                         startPoint: .top, endPoint: .bottom
                     )
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 3.5, style: .continuous)
-                        .strokeBorder(shellStroke, lineWidth: 1.4)
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .strokeBorder(Color.black.opacity(0.45), lineWidth: 0.75)
                 )
 
-            // Five contacts, matching the real connector.
-            HStack(spacing: 3.5) {
-                ForEach(0..<5, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 1, style: .continuous)
-                        .fill(Theme.contact.opacity(energised ? 0.9 : 0.42))
-                        .frame(width: 4.5, height: 5)
-                }
+            // Orientation is invisible from above on a real connector, so it
+            // gets an explicit marker rather than a fake asymmetry: the pip
+            // sits on whichever side is up.
+            if orientation != .unknown {
+                Capsule()
+                    .fill(energised ? Theme.live.opacity(0.9) : Theme.idle)
+                    .frame(width: 12, height: 3)
+                    .padding(.vertical, 3.5)
             }
         }
-        .frame(width: 54, height: 13)
+        .frame(width: overmoldWidth, height: 34)
     }
 
-    private var unknownPort: some View {
-        RoundedRectangle(cornerRadius: 3, style: .continuous)
-            .strokeBorder(Theme.idle, style: StrokeStyle(lineWidth: 1.2, dash: [3, 3]))
-            .frame(width: 48, height: 15)
+    private var orientationAlignment: Alignment {
+        orientation == .flipped ? .bottom : .top
+    }
+
+    private var overmoldWidth: CGFloat {
+        switch kind {
+        case .usbC: return 40
+        case .magSafe: return 36
+        case .unknown: return 36
+        }
+    }
+
+    /// Tapers the silhouette down to cable diameter.
+    private var strainRelief: some View {
+        RoundedRectangle(cornerRadius: 4, style: .continuous)
+            .fill(
+                LinearGradient(
+                    colors: [Color.white.opacity(0.12), Color.black.opacity(0.5)],
+                    startPoint: .top, endPoint: .bottom
+                )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .strokeBorder(Color.black.opacity(0.4), lineWidth: 0.75)
+            )
+            .frame(width: 17, height: 22)
     }
 }
 
-/// The machine's chassis edge, so the connector reads as plugged into
-/// something rather than floating.
+/// The machine's chassis edge, so the plug reads as inserted into something
+/// rather than floating in space.
 struct ChassisEdge: View {
+    var dimmed: Bool = false
+
     var body: some View {
         UnevenRoundedRectangle(
-            topLeadingRadius: 4, bottomLeadingRadius: 4,
-            bottomTrailingRadius: 0, topTrailingRadius: 0,
+            topLeadingRadius: 5, bottomLeadingRadius: 5,
+            bottomTrailingRadius: 1, topTrailingRadius: 1,
             style: .continuous
         )
         .fill(
             LinearGradient(
-                colors: [Theme.metal.opacity(0.42), Theme.metal.opacity(0.16)],
+                colors: [Theme.metal.opacity(0.45), Theme.metal.opacity(0.14)],
                 startPoint: .leading, endPoint: .trailing
             )
         )
-        .frame(width: 13)
+        .frame(width: 14, height: 58)
+        .opacity(dimmed ? 0.4 : 1)
     }
 }

@@ -8,7 +8,7 @@ struct BrickView: View {
     let liveWatts: Double?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 6) {
             header
             if let capabilities = contract?.sourceCapabilities, !capabilities.isEmpty {
                 Divider().opacity(0.35)
@@ -17,7 +17,7 @@ struct BrickView: View {
         }
         .padding(.horizontal, 11)
         .padding(.vertical, 10)
-        .frame(width: 172, alignment: .leading)
+        .frame(width: 168, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 11, style: .continuous)
                 .fill(Color.black.opacity(0.26))
@@ -26,7 +26,7 @@ struct BrickView: View {
                         .strokeBorder(Theme.metal.opacity(0.3), lineWidth: 1)
                 )
         )
-        .overlay(alignment: .trailing) { prongs.offset(x: 7) }
+        .overlay(alignment: .leading) { cableEntry.offset(x: -4) }
     }
 
     private var header: some View {
@@ -51,30 +51,33 @@ struct BrickView: View {
     }
 
     private func capabilityList(_ capabilities: [PowerDataObject]) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        LazyVGrid(
+            columns: [GridItem(.flexible(), spacing: 6, alignment: .leading),
+                      GridItem(.flexible(), spacing: 6, alignment: .leading)],
+            alignment: .leading, spacing: 3
+        ) {
             ForEach(Array(capabilities.enumerated()), id: \.offset) { index, pdo in
                 let selected = contract?.request?.objectPosition == index + 1
-                HStack(spacing: 5) {
+                HStack(spacing: 4) {
                     Circle()
                         .fill(selected ? Theme.live : Theme.idle)
                         .frame(width: 4, height: 4)
                     Text(pdo.label)
-                        .readout(10, weight: selected ? .semibold : .regular)
+                        .readout(9.5, weight: selected ? .semibold : .regular)
                         .foregroundStyle(selected ? .primary : .secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                     Spacer(minLength: 0)
                 }
             }
         }
     }
 
-    private var prongs: some View {
-        VStack(spacing: 5) {
-            ForEach(0..<2, id: \.self) { _ in
-                RoundedRectangle(cornerRadius: 1, style: .continuous)
-                    .fill(Theme.metal.opacity(0.55))
-                    .frame(width: 8, height: 3)
-            }
-        }
+    /// Strain relief where the cable enters the housing.
+    private var cableEntry: some View {
+        RoundedRectangle(cornerRadius: 3, style: .continuous)
+            .fill(Theme.metal.opacity(0.4))
+            .frame(width: 9, height: 14)
     }
 }
 
@@ -93,13 +96,37 @@ struct PassiveEndView: View {
         }
         .padding(.horizontal, 11)
         .padding(.vertical, 10)
-        .frame(width: 172, alignment: .leading)
+        .frame(width: 168, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 11, style: .continuous)
                 .strokeBorder(
                     Theme.idle,
                     style: StrokeStyle(lineWidth: 1, dash: [4, 3])
                 )
+        )
+    }
+}
+
+/// The far end of an empty port. Keeps the diagram's footprint so switching
+/// between ports does not resize the panel.
+struct EmptyEndView: View {
+    let portName: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Nothing connected")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+            Text("\(portName) is idle")
+                .readout(10)
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, 10)
+        .frame(width: 168, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                .strokeBorder(Theme.idle, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
         )
     }
 }

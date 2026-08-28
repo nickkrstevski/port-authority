@@ -25,6 +25,20 @@ public struct AdapterState: Codable, Sendable, Equatable {
         return max(0, adapterWatts - systemWatts)
     }
 
+    public init(
+        adapterWatts: Double?, systemWatts: Double?, ratedWatts: Double?,
+        voltageMillivolts: Int?, currentMilliamps: Int?,
+        description: String?, isCharging: Bool
+    ) {
+        self.adapterWatts = adapterWatts
+        self.systemWatts = systemWatts
+        self.ratedWatts = ratedWatts
+        self.voltageMillivolts = voltageMillivolts
+        self.currentMilliamps = currentMilliamps
+        self.description = description
+        self.isCharging = isCharging
+    }
+
     public static let disconnected = AdapterState(
         adapterWatts: nil, systemWatts: nil, ratedWatts: nil,
         voltageMillivolts: nil, currentMilliamps: nil,
