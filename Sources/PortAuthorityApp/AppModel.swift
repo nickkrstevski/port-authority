@@ -157,10 +157,7 @@ final class AppModel: ObservableObject {
 
             var trace = traces[id] ?? PowerTrace()
             trace.append(
-                PowerSample(
-                    elapsed: now.timeIntervalSince(start), watts: watts, volts: volts,
-                    dataGbps: entry.display?.gigabitsPerSecond ?? 0
-                )
+                PowerSample(elapsed: now.timeIntervalSince(start), watts: watts, volts: volts)
             )
             traces[id] = trace
         }

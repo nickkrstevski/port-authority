@@ -25,10 +25,9 @@ struct PowerChart: View {
         static let power = "Power"
         static let voltage = "Voltage"
         static let current = "Current"
-        static let data = "Data"
-        static let order = [power, voltage, current, data]
+        static let order = [power, voltage, current]
         static let colors: [String: Color] = [
-            power: .green, voltage: .red, current: .blue, data: .purple,
+            power: .green, voltage: .red, current: .blue,
         ]
     }
 
@@ -40,10 +39,6 @@ struct PowerChart: View {
     private var voltsScale: Double {
         max(contract?.sourceCapabilities.compactMap(maxVolts).max() ?? 0, trace.peak(\.volts), 1)
     }
-    private var hasData: Bool { trace.peak(\.dataGbps) > 0 }
-
-    private var dataScale: Double { max(trace.peak(\.dataGbps), 1) }
-
     private var ampsScale: Double {
         max(contract?.sourceCapabilities.compactMap(maxAmps).max() ?? 0, trace.peak(\.amps), 1)
     }
@@ -74,10 +69,6 @@ struct PowerChart: View {
                                 value: sample.volts / voltsScale, series: Series.voltage))
             result.append(Point(id: index * 3 + 2, elapsed: sample.elapsed,
                                 value: sample.amps / ampsScale, series: Series.current))
-            if hasData {
-                result.append(Point(id: index * 3 + 100_000, elapsed: sample.elapsed,
-                                    value: sample.dataGbps / dataScale, series: Series.data))
-            }
         }
         return result
     }
@@ -147,13 +138,6 @@ struct PowerChart: View {
             legendItem(Series.power, .green, latest.map { "\(Watts.short($0.watts))W" }, wattsScale, "W")
             legendItem(Series.voltage, .red, latest.map { trimmed($0.volts) + "V" }, voltsScale, "V")
             legendItem(Series.current, .blue, latest.map { trimmed($0.amps) + "A" }, ampsScale, "A")
-            if hasData {
-                legendItem(
-                    Series.data, .purple,
-                    latest.map { String(format: "%.1f", $0.dataGbps) + "Gb/s" },
-                    dataScale, "Gb/s"
-                )
-            }
             Spacer(minLength: 0)
         }
     }
@@ -185,10 +169,6 @@ struct PowerChart: View {
         var text = "Each series scaled to its own maximum. Power is measured; "
         text += "voltage is the negotiated contract, so current, derived from both, "
         text += "tracks power until the contract changes."
-        if hasData {
-            text += " Data is the video stream (pixels x refresh x depth); "
-            text += "DisplayPort has no throughput counter, so it is flat by nature."
-        }
         if trace.interval > 1 {
             text += " Resolution \(Int(trace.interval))s."
         }

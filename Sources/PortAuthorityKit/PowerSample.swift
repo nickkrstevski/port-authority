@@ -12,16 +12,12 @@ public struct PowerSample: Sendable, Equatable {
     public let watts: Double
     public let volts: Double
     public let amps: Double
-    /// Video stream bandwidth on the port's DisplayPort lanes, in Gb/s.
-    /// Zero when no display is attributable to this port.
-    public let dataGbps: Double
 
-    public init(elapsed: TimeInterval, watts: Double, volts: Double, dataGbps: Double = 0) {
+    public init(elapsed: TimeInterval, watts: Double, volts: Double) {
         self.elapsed = elapsed
         self.watts = watts
         self.volts = volts
         self.amps = volts > 0 ? watts / volts : 0
-        self.dataGbps = dataGbps
     }
 }
 
