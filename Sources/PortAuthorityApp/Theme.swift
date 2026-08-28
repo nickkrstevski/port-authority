@@ -17,6 +17,22 @@ enum Theme {
     }
 }
 
+/// Wattage formatting: always two or three significant digits, never one and
+/// never four. 1.4, 5.7, 10, 85, 140 -- but not 6 and not 100.4.
+enum Watts {
+    static func short(_ value: Double) -> String {
+        // Guard the boundary: 9.97 must not format as "10.0", which would be
+        // three digits plus a decimal.
+        value < 9.95
+            ? String(format: "%.1f", value)
+            : String(format: "%.0f", value)
+    }
+
+    static func short(_ value: Double?) -> String {
+        value.map(short) ?? "--"
+    }
+}
+
 extension View {
     /// Numbers in this UI change every two seconds; without fixed-width
     /// digits the whole layout twitches on each refresh.

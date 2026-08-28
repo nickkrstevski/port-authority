@@ -37,7 +37,7 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
                 if let watts = model.adapter.adapterWatts, watts > 0.5 {
                     HStack(alignment: .firstTextBaseline, spacing: 3) {
-                        Text(String(format: "%.1f", watts)).readout(27, weight: .semibold)
+                        Text(Watts.short(watts)).readout(27, weight: .semibold)
                         Text("W").readout(13).foregroundStyle(.secondary)
                     }
                 } else {
@@ -67,8 +67,8 @@ struct ContentView: View {
             .frame(width: 116, height: 5)
 
             HStack(spacing: 9) {
-                legend("system", String(format: "%.0fW", system), Theme.live)
-                legend("battery", String(format: "%.0fW", battery), Theme.live.opacity(0.4))
+                legend("system", "\(Watts.short(system))W", Theme.live)
+                legend("battery", "\(Watts.short(battery))W", Theme.live.opacity(0.4))
             }
         }
     }
@@ -85,7 +85,7 @@ struct ContentView: View {
             ForEach(model.ports) { entry in
                 let isSelected = model.selectedPort?.id == entry.id
                 Button {
-                    model.selectedPortID = entry.id
+                    model.select(portID: entry.id)
                 } label: {
                     HStack(spacing: 4) {
                         Circle()
@@ -127,7 +127,7 @@ struct ContentView: View {
                     detailRow("Transports", port.transportsActive.joined(separator: " · "))
                 }
                 if let contract = snapshot.contract, let watts = contract.contractWatts {
-                    detailRow("Contract", String(format: "%.0fW ceiling", watts))
+                    detailRow("Contract", "\(Watts.short(watts))W ceiling")
                 }
                 if snapshot.contract?.supportsPPS == true {
                     detailRow("PPS", "Supported")

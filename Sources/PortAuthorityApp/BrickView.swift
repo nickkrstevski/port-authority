@@ -35,7 +35,7 @@ struct BrickView: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.primary)
             if let rated = adapter.ratedWatts {
-                Text("\(Int(rated))W rated")
+                Text("\(Watts.short(rated))W rated")
                     .readout(10)
                     .foregroundStyle(.secondary)
             }

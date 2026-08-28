@@ -5,7 +5,12 @@ import SwiftUI
 @MainActor
 final class AppModel: ObservableObject {
     @Published private(set) var snapshot: SystemSnapshot?
-    @Published var selectedPortID: UInt64?
+    @Published private(set) var selectedPortID: UInt64?
+
+    /// Once the user picks a port, that choice sticks. Without this the
+    /// auto-follow below re-ran on every refresh and dragged the selection
+    /// back to whichever port had power.
+    private var userPickedPort = false
 
     /// Registry and battery reads are cheap, so wattage updates at 1Hz.
     private let fastInterval: TimeInterval = 1
@@ -24,6 +29,12 @@ final class AppModel: ObservableObject {
     var selectedPort: PortSnapshot? {
         guard let id = selectedPortID else { return defaultPort }
         return ports.first { $0.id == id } ?? defaultPort
+    }
+
+    /// An explicit choice from the port picker.
+    func select(portID: UInt64) {
+        userPickedPort = true
+        selectedPortID = portID
     }
 
     /// Prefer showing something live: the first connected port, else the first.
@@ -103,21 +114,26 @@ final class AppModel: ObservableObject {
     private func apply(_ fresh: SystemSnapshot, previous: SystemSnapshot?) {
         snapshot = fresh
 
-        // Follow the action: if the selection is empty but something else got
-        // plugged in, move to it rather than showing a blank panel.
-        if let id = selectedPortID,
+        guard let id = selectedPortID,
+              fresh.ports.contains(where: { $0.id == id })
+        else {
+            selectedPortID = defaultPort?.id
+            return
+        }
+
+        // Follow a newly plugged-in port only while the user has not chosen
+        // one themselves; an explicit pick is never overridden.
+        if !userPickedPort,
            let current = fresh.ports.first(where: { $0.id == id }),
            !current.port.connected,
            let live = fresh.ports.first(where: \.port.connected) {
             selectedPortID = live.id
-        } else if selectedPortID == nil {
-            selectedPortID = defaultPort?.id
         }
     }
 
     /// Menu bar title: live draw when charging, otherwise a compact idle mark.
     var menuBarLabel: String {
         guard let watts = adapter.adapterWatts, watts > 0.5 else { return "" }
-        return String(format: "%.0fW", watts)
+        return "\(Watts.short(watts))W"
     }
 }
