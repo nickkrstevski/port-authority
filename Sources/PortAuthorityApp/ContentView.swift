@@ -152,6 +152,7 @@ struct ContentView: View {
         if port.connected {
             VStack(alignment: .leading, spacing: 10) {
                 if let cable = snapshot.cable { cableSection(cable, port: port) }
+                if let display = snapshot.display { displaySection(display) }
                 if let contract = snapshot.contract {
                     contractSection(contract, liveWatts: liveWatts(for: snapshot))
                 }
@@ -176,6 +177,16 @@ struct ContentView: View {
             if cable.carriesDisplay {
                 detailRow("DisplayPort", cable.displayAttached ? "Display attached" : "Capable")
             }
+        }
+    }
+
+    private func displaySection(_ display: DisplayStream) -> some View {
+        section("Display") {
+            detailRow("Mode", display.modeLabel)
+            detailRow(
+                "Stream", String(format: "%.2f Gb/s", display.gigabitsPerSecond),
+                note: "at \(display.bitsPerPixel / 3) bpc"
+            )
         }
     }
 
@@ -311,6 +322,11 @@ struct ConnectionDiagram: View {
     let liveWatts: Double?
 
     private var connected: Bool { snapshot.port.connected }
+
+    /// A port on the machine's left edge has its cable leaving to the left,
+    /// so the whole scene mirrors: machine on the right, source on the left,
+    /// plug pointing right into it.
+    private var mirrored: Bool { snapshot.port.location.side == .left }
     private var energised: Bool { connected && (liveWatts ?? 0) > 0.5 }
 
     /// How hard the cable is working relative to what was negotiated.
@@ -361,20 +377,26 @@ struct ConnectionDiagram: View {
 
             endpoint
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        // Mirroring the assembled scene keeps the geometry exact; the source
+        // panel counter-flips its own contents so its text still reads.
+        .scaleEffect(x: mirrored ? -1 : 1, y: 1, anchor: .center)
+        .frame(maxWidth: .infinity, alignment: mirrored ? .trailing : .leading)
         .padding(.vertical, 6)
-        .padding(.leading, -15)
+        .padding(mirrored ? .trailing : .leading, -15)
         .animation(.easeInOut(duration: 0.25), value: connected)
     }
 
     @ViewBuilder
     private var endpoint: some View {
         if !connected {
-            EmptyEndView(portName: shortLabel)
+            EmptyEndView(portName: shortLabel, mirrored: mirrored)
         } else if snapshot.contract != nil {
-            BrickView(contract: snapshot.contract, adapter: adapter, liveWatts: liveWatts)
+            BrickView(
+                contract: snapshot.contract, adapter: adapter,
+                liveWatts: liveWatts, mirrored: mirrored
+            )
         } else {
-            PassiveEndView(transports: snapshot.port.transportsActive)
+            PassiveEndView(transports: snapshot.port.transportsActive, mirrored: mirrored)
         }
     }
 

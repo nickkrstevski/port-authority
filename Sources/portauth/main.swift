@@ -32,6 +32,9 @@ case "status":
             print("    transports   \(port.transportsActive.joined(separator: ", "))")
         }
 
+        if let display = entry.display {
+            print("    display      \(display.modeLabel)  ->  \(String(format: "%.2f", display.gigabitsPerSecond)) Gb/s pixel data")
+        }
         guard let contract = entry.contract else {
             print("    (no PD detail)")
             continue

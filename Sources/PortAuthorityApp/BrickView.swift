@@ -6,6 +6,9 @@ struct BrickView: View {
     let contract: PDContract?
     let adapter: AdapterState
     let liveWatts: Double?
+    /// Set when the whole scene is mirrored, so the contents flip back and
+    /// the text stays readable.
+    var mirrored: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -27,6 +30,7 @@ struct BrickView: View {
                 )
         )
         .overlay(alignment: .leading) { cableEntry.offset(x: -4) }
+        .scaleEffect(x: mirrored ? -1 : 1, y: 1)
     }
 
     private var header: some View {
@@ -85,6 +89,7 @@ struct BrickView: View {
 /// a display, a dock's upstream link, a plain data cable.
 struct PassiveEndView: View {
     let transports: [String]
+    var mirrored: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -104,6 +109,7 @@ struct PassiveEndView: View {
                     style: StrokeStyle(lineWidth: 1, dash: [4, 3])
                 )
         )
+        .scaleEffect(x: mirrored ? -1 : 1, y: 1)
     }
 }
 
@@ -111,6 +117,7 @@ struct PassiveEndView: View {
 /// between ports does not resize the panel.
 struct EmptyEndView: View {
     let portName: String
+    var mirrored: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -128,5 +135,6 @@ struct EmptyEndView: View {
             RoundedRectangle(cornerRadius: 11, style: .continuous)
                 .strokeBorder(Theme.idle, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
         )
+        .scaleEffect(x: mirrored ? -1 : 1, y: 1)
     }
 }

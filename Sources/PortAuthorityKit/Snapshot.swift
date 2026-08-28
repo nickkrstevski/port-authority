@@ -6,15 +6,18 @@ public struct PortSnapshot: Codable, Sendable, Identifiable {
     /// Nil when nothing is attached, or when the register layer is
     /// unavailable and we are running on registry data alone.
     public let contract: PDContract?
+    /// The video stream on this port, when it can be attributed to it.
+    public let display: DisplayStream?
 
     /// Derived cable facts, nil when the port is empty.
     public var cable: CableProfile? {
         port.connected ? CableProfile(port: port, contract: contract) : nil
     }
 
-    public init(port: PortInfo, contract: PDContract?) {
+    public init(port: PortInfo, contract: PDContract?, display: DisplayStream? = nil) {
         self.port = port
         self.contract = contract
+        self.display = display
     }
 }
 
@@ -66,14 +69,30 @@ public enum PortAuthority {
             failure = "\(error)"
         }
 
+        let displays = DisplayReader.externalStreams()
+        // macOS does not say which port a display arrived on. Attribution is
+        // only safe when it is unambiguous: exactly one port asserting hot
+        // plug detect, and exactly one external display. Otherwise leave it
+        // unattributed rather than guessing which cable it came down.
+        let displayPorts = ports.filter { $0.connected && $0.hpdAsserted }
+        let attributable = displayPorts.count == 1 && displays.count == 1
+
         let snapshots = ports.map { port -> PortSnapshot in
             // Only attempt a contract for ports that actually have something
             // attached; an idle controller's registers are stale, not empty.
+            let display = (attributable && port.registryEntryID == displayPorts[0].registryEntryID)
+                ? displays.first : nil
+
             guard port.connected,
                   let rid = port.rid,
                   let controller = controllers[rid]
-            else { return PortSnapshot(port: port, contract: nil) }
-            return PortSnapshot(port: port, contract: PDRegisters.contract(from: controller))
+            else { return PortSnapshot(port: port, contract: nil, display: display) }
+
+            return PortSnapshot(
+                port: port,
+                contract: PDRegisters.contract(from: controller),
+                display: display
+            )
         }
 
         return SystemSnapshot(

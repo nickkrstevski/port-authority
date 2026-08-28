@@ -73,7 +73,8 @@ enum PreviewRenderer {
 
     private static func samples() -> [(String, SystemSnapshot)] {
         [
-            ("charging-100w", chargingSnapshot()),
+            ("charging-right", chargingSnapshot()),
+            ("charging-left", chargingSnapshot(onLeft: true)),
             ("empty-port", emptySnapshot()),
         ]
     }
@@ -98,7 +99,7 @@ enum PreviewRenderer {
 
     /// Mirrors the real 100W capture in Fixtures/, including the 4.7A contract
     /// that implies an e-marked cable.
-    private static func chargingSnapshot() -> SystemSnapshot {
+    private static func chargingSnapshot(onLeft: Bool = false) -> SystemSnapshot {
         let caps: [PowerDataObject] = [
             .fixed(volts: 5, maxAmps: 3, unconstrained: true, eprCapable: false),
             .fixed(volts: 9, maxAmps: 3, unconstrained: true, eprCapable: false),
@@ -115,7 +116,10 @@ enum PreviewRenderer {
                 PortSnapshot(port: port(id: 1, number: 1, kind: .usbC, connected: false, location: .leftBack), contract: nil),
                 PortSnapshot(port: port(id: 2, number: 2, kind: .usbC, connected: false, location: .leftFront), contract: nil),
                 PortSnapshot(
-                    port: port(id: 3, number: 3, kind: .usbC, connected: true, location: .right, transports: ["USB3"]),
+                    port: port(
+                        id: 3, number: 3, kind: .usbC, connected: true,
+                        location: onLeft ? .leftFront : .right, transports: ["USB3"]
+                    ),
                     contract: contract
                 ),
                 PortSnapshot(port: port(id: 4, number: 1, kind: .magSafe, connected: false, location: .left), contract: nil),
