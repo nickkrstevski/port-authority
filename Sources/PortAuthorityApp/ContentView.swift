@@ -4,14 +4,12 @@ import SwiftUI
 struct ContentView: View {
     @ObservedObject var model: AppModel
 
-    /// Details list vs power trace. Kept here rather than in the model: it is
-    /// a view preference, not device state.
-    @State private var showChart: Bool
-
     init(model: AppModel, initialShowChart: Bool = false) {
         self.model = model
-        _showChart = State(initialValue: initialShowChart)
+        if initialShowChart { model.showChart = true }
     }
+
+    private var showChart: Bool { model.showChart }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -24,14 +22,25 @@ struct ContentView: View {
                     liveWatts: liveWatts(for: selected)
                 )
                 if selected.port.connected { modeToggle }
-                if showChart {
-                    PowerChart(
-                        trace: model.trace(for: selected.id) ?? PowerTrace(),
-                        contract: selected.contract
-                    )
-                } else {
-                    details(for: selected)
+
+                // Fixed height, deliberately. The panel is a window that
+                // sizes to its content, and swapping regions of different
+                // heights made NSHostingView push new size extrema onto that
+                // window mid-constraint-pass, which AppKit answers with an
+                // exception. Holding this region's height constant means the
+                // panel never has to resize, so that path is never taken.
+                ScrollView(.vertical, showsIndicators: false) {
+                    if showChart {
+                        PowerChart(
+                            trace: model.trace(for: selected.id) ?? PowerTrace(),
+                            contract: selected.contract
+                        )
+                    } else {
+                        details(for: selected)
+                    }
                 }
+                .frame(height: selected.port.connected ? 246 : 0)
+                .scrollBounceBehavior(.basedOnSize)
             }
             footer
         }
@@ -246,16 +255,16 @@ struct ContentView: View {
     private var modeToggle: some View {
         HStack {
             Button {
-                withAnimation(.snappy(duration: 0.28)) { showChart.toggle() }
+                model.showChart.toggle()
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: showChart ? "chart.xyaxis.line" : "list.bullet")
                         .contentTransition(.symbolEffect(.replace.downUp))
                         .font(.system(size: 11, weight: .semibold))
                         .frame(width: 14)
+                        .animation(.snappy(duration: 0.28), value: showChart)
                     Text(showChart ? "Trace" : "Details")
                         .font(.system(size: 10, weight: .medium))
-                        .contentTransition(.numericText())
                 }
                 .padding(.horizontal, 9)
                 .padding(.vertical, 4)

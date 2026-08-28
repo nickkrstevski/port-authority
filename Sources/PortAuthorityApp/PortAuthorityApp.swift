@@ -12,6 +12,10 @@ struct PortAuthorityApp: App {
             PreviewRenderer.run(outputDirectory: arguments[index + 1])
             exit(0)
         }
+        if SelfTest.isActive {
+            SelfTest.run()
+            exit(0)
+        }
     }
 
     var body: some Scene {

@@ -100,12 +100,18 @@ struct PlugMetrics {
     static func forKind(_ kind: PortKind) -> PlugMetrics {
         switch kind {
         case .magSafe:
-            // The MagSafe head is the widest part and much shorter than a
-            // USB-C shell; it sits proud of the housing behind it.
+            // MagSafe 3 is 13.21mm wide, 4.5mm tall, 18.78mm long. Published
+            // by cable manufacturers rather than Apple, so this is the least
+            // solid number here, but it beats the 15mm that was guessed.
+            //
+            // Unlike USB-C there is no separate housing: the magnetic head is
+            // the widest part and the cable leaves it almost immediately, so
+            // the "housing" section is drawn narrower than the head rather
+            // than wider.
             return PlugMetrics(
-                shellAcross: 15.0 * scale, shellLong: 8.5 * scale, shellRadius: 2.0 * scale,
-                housingAcross: 11.5 * scale, housingLong: 15.0 * scale,
-                reliefLong: 6.0 * scale
+                shellAcross: 13.21 * scale, shellLong: 10.0 * scale, shellRadius: 1.6 * scale,
+                housingAcross: 9.5 * scale, housingLong: 8.8 * scale,
+                reliefLong: 5.0 * scale
             )
         case .usbC, .unknown:
             return PlugMetrics(

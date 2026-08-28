@@ -6,6 +6,8 @@ import SwiftUI
 final class AppModel: ObservableObject {
     @Published private(set) var snapshot: SystemSnapshot?
     @Published private(set) var selectedPortID: UInt64?
+    /// Details list vs power trace.
+    @Published var showChart = false
 
     /// Once the user picks a port, that choice sticks. Without this the
     /// auto-follow below re-ran on every refresh and dragged the selection
