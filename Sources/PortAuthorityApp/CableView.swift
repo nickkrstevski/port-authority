@@ -10,6 +10,8 @@ struct CableView: View {
     let heavyGauge: Bool
     var dimmed: Bool = false
 
+    @Environment(\.colorScheme) private var scheme
+
     /// From above a ~4mm cable is a third the width of the ~12mm housing it
     /// leaves. That ratio is the clearest signal that this is a top view and
     /// not a side elevation, where the same cable would be two thirds of it.
@@ -19,9 +21,14 @@ struct CableView: View {
         GeometryReader { geometry in
             ZStack {
                 Capsule()
-                    .fill(Material.topFace(Material.shell, specular: 0.58))
+                    .fill(Material.roundCable(Material.cable(scheme), scheme: scheme))
                     .overlay(
-                        Capsule().strokeBorder(Color.black.opacity(0.20), lineWidth: 0.6)
+                        Capsule().strokeBorder(
+                            scheme == .dark
+                                ? Color.black.opacity(0.28)
+                                : Color.white.opacity(0.12),
+                            lineWidth: 0.6
+                        )
                     )
                     .frame(height: thickness)
 
@@ -55,18 +62,18 @@ struct CableView: View {
             let phase = CGFloat((time * speed).truncatingRemainder(dividingBy: 1)) * spacing
 
             Canvas { context, size in
-                context.addFilter(.blur(radius: 2.2))
+                context.addFilter(.blur(radius: 2.6))
                 for index in 0..<count {
                     let x = width - (CGFloat(index) * spacing - phase)
                     guard x > -spacing, x < width + spacing else { continue }
-                    let height = thickness * 0.42
+                    let height = thickness * 0.34
                     let rect = CGRect(
                         x: x - 4, y: size.height / 2 - height / 2,
                         width: 8, height: height
                     )
                     context.fill(
                         Capsule().path(in: rect),
-                        with: .color(Theme.live.opacity(0.34 + intensity * 0.38))
+                        with: .color(Theme.live.opacity(0.30 + intensity * 0.34))
                     )
                 }
             }

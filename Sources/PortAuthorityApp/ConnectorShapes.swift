@@ -9,23 +9,69 @@ import SwiftUI
 /// middle and darkens late. Narrow highlights with heavy falloff read as a
 /// circular tube seen side-on, which is the wrong view entirely.
 enum Material {
-    static func topFace(_ base: Color, specular: Double = 0.70) -> LinearGradient {
-        LinearGradient(
+
+    /// Moulded cable and housing, inverted against the panel: white cable on
+    /// a dark panel, black cable on a light one, so it always separates from
+    /// the background.
+    static func cable(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(white: 0.85) : Color(white: 0.15)
+    }
+
+    /// A dark cable would be blown out by the same highlight that a white one
+    /// needs, so gloss scales with the base.
+    static func gloss(_ scheme: ColorScheme) -> Double {
+        scheme == .dark ? 0.70 : 0.40
+    }
+
+    /// Edge shading. On a pale cable the form is described by darkening the
+    /// edges; on a dark one there is no headroom left below the base, so the
+    /// edges are carried by the highlight falling away instead.
+    private static func edge(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.black.opacity(0.55) : Color.black.opacity(0.85)
+    }
+
+    /// A flattened body seen from above: broad, nearly flat top face with the
+    /// form falling away only near the two long edges. Used for the plug
+    /// housing and strain relief.
+    static func topFace(_ base: Color, scheme: ColorScheme, specular: Double? = nil) -> LinearGradient {
+        let gloss = specular ?? Material.gloss(scheme)
+        return LinearGradient(
             stops: [
                 .init(color: base.opacity(0.50), location: 0.00),
                 .init(color: base.opacity(0.86), location: 0.09),
-                .init(color: Color.white.opacity(specular), location: 0.21),
+                .init(color: Color.white.opacity(gloss), location: 0.21),
                 .init(color: base, location: 0.34),
                 .init(color: base.opacity(0.95), location: 0.62),
                 .init(color: base.opacity(0.66), location: 0.82),
-                .init(color: Color.black.opacity(0.34), location: 0.94),
-                .init(color: Color.black.opacity(0.55), location: 1.00),
+                .init(color: edge(scheme).opacity(0.62), location: 0.94),
+                .init(color: edge(scheme), location: 1.00),
             ],
             startPoint: .top, endPoint: .bottom
         )
     }
 
-    static let shell = Color(white: 0.82)
+    /// A round cable is a genuinely circular cross-section, so unlike the
+    /// flattened housing it gets a narrow specular line and falls away hard to
+    /// both edges. Using the flat-top gradient here made it read as a strip of
+    /// tape rather than a wire.
+    static func roundCable(_ base: Color, scheme: ColorScheme) -> LinearGradient {
+        let gloss = Material.gloss(scheme)
+        return LinearGradient(
+            stops: [
+                .init(color: edge(scheme).opacity(0.75), location: 0.00),
+                .init(color: base.opacity(0.55), location: 0.13),
+                .init(color: base.opacity(0.92), location: 0.24),
+                .init(color: Color.white.opacity(gloss), location: 0.31),
+                .init(color: base.opacity(0.96), location: 0.42),
+                .init(color: base.opacity(0.74), location: 0.60),
+                .init(color: base.opacity(0.40), location: 0.78),
+                .init(color: edge(scheme).opacity(0.80), location: 0.92),
+                .init(color: edge(scheme), location: 1.00),
+            ],
+            startPoint: .top, endPoint: .bottom
+        )
+    }
+
     static let steel = Color(red: 0.71, green: 0.73, blue: 0.76)
     static let aluminium = Color(red: 0.55, green: 0.57, blue: 0.60)
 }
@@ -81,7 +127,10 @@ struct TopDownPlug: View {
     let energised: Bool
     var dimmed: Bool = false
 
+    @Environment(\.colorScheme) private var scheme
+
     private var metrics: PlugMetrics { .forKind(kind) }
+    private var body_: Color { Material.cable(scheme) }
 
     var body: some View {
         HStack(spacing: -3) {
@@ -97,7 +146,7 @@ struct TopDownPlug: View {
 
     private var shell: some View {
         RoundedRectangle(cornerRadius: metrics.shellRadius, style: .continuous)
-            .fill(Material.topFace(Material.steel, specular: 0.88))
+            .fill(Material.topFace(Material.steel, scheme: scheme, specular: 0.88))
             .overlay(
                 // Seam along the drawn metal shell.
                 Rectangle()
@@ -116,17 +165,20 @@ struct TopDownPlug: View {
     private var housing: some View {
         ZStack(alignment: orientation == .flipped ? .bottom : .top) {
             RoundedRectangle(cornerRadius: 5.5, style: .continuous)
-                .fill(Material.topFace(Material.shell))
+                .fill(Material.topFace(body_, scheme: scheme))
                 .overlay(
                     RoundedRectangle(cornerRadius: 5.5, style: .continuous)
-                        .strokeBorder(Color.black.opacity(0.20), lineWidth: 0.6)
+                        .strokeBorder(
+                            scheme == .dark ? Color.black.opacity(0.20) : Color.white.opacity(0.14),
+                            lineWidth: 0.6
+                        )
                 )
 
             // Orientation is genuinely invisible from above, so it is marked
             // rather than faked: the pip sits on whichever face is up.
             if orientation != .unknown {
                 Capsule()
-                    .fill(energised ? Theme.live : Color.black.opacity(0.26))
+                    .fill(energised ? Theme.live : (scheme == .dark ? Color.black.opacity(0.26) : Color.white.opacity(0.30)))
                     .frame(width: 13, height: 3)
                     .padding(.vertical, 4.5)
             }
@@ -139,7 +191,7 @@ struct TopDownPlug: View {
             leadingAcross: metrics.housingAcross * 0.76,
             trailingAcross: PlugMetrics.cableAcross(heavyGauge: false) + 2
         )
-        .fill(Material.topFace(Material.shell, specular: 0.58))
+        .fill(Material.topFace(body_, scheme: scheme, specular: Material.gloss(scheme) * 0.8))
         .overlay(ribs)
         .frame(width: metrics.reliefLong, height: metrics.housingAcross)
     }
@@ -149,7 +201,7 @@ struct TopDownPlug: View {
             ForEach(0..<3, id: \.self) { index in
                 let step = (geometry.size.width - 5) / 3
                 Capsule()
-                    .fill(Color.black.opacity(0.15))
+                    .fill(scheme == .dark ? Color.black.opacity(0.15) : Color.white.opacity(0.16))
                     .frame(width: 1.3, height: geometry.size.height * (0.58 - CGFloat(index) * 0.07))
                     .position(x: 3 + CGFloat(index) * step, y: geometry.size.height / 2)
             }
