@@ -242,7 +242,7 @@ struct MachineBody: View {
     var dimmed: Bool = false
 
     private var slotAcross: CGFloat {
-        PlugMetrics.forKind(portKind).shellAcross + 2
+        PlugMetrics.forKind(portKind).shellAcross
     }
 
     var body: some View {
@@ -272,11 +272,13 @@ struct MachineBody: View {
                 .frame(width: 1.2)
             }
 
-            // The port cut into the wall, mostly filled by the plug.
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(Color.black.opacity(0.66))
-                .frame(width: 9, height: slotAcross)
-                .offset(x: 1)
+            // A hint of the opening at the outer edge, no wider than the
+            // shell that fills it. A deep notch drew the eye to a hole rather
+            // than to the plug sitting in it.
+            RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                .fill(Color.black.opacity(0.34))
+                .frame(width: 3.5, height: slotAcross)
+                .offset(x: 1.5)
         }
         .frame(width: 40, height: 132)
         .mask(
