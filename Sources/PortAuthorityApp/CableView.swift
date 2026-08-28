@@ -10,15 +10,16 @@ struct CableView: View {
     let heavyGauge: Bool
     var dimmed: Bool = false
 
-    /// From above, a ~4mm cable is roughly a third the width of the ~12mm
-    /// housing it leaves, so it reads as distinctly thinner than the plug.
-    private var thickness: CGFloat { heavyGauge ? 14 : 11 }
+    /// From above a ~4mm cable is a third the width of the ~12mm housing it
+    /// leaves. That ratio is the clearest signal that this is a top view and
+    /// not a side elevation, where the same cable would be two thirds of it.
+    private var thickness: CGFloat { PlugMetrics.cableAcross(heavyGauge: heavyGauge) }
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 Capsule()
-                    .fill(Material.cylinder(Material.shell, specular: 0.62))
+                    .fill(Material.topFace(Material.shell, specular: 0.58))
                     .overlay(
                         Capsule().strokeBorder(Color.black.opacity(0.20), lineWidth: 0.6)
                     )

@@ -7,6 +7,11 @@ public struct PortSnapshot: Codable, Sendable, Identifiable {
     /// unavailable and we are running on registry data alone.
     public let contract: PDContract?
 
+    /// Derived cable facts, nil when the port is empty.
+    public var cable: CableProfile? {
+        port.connected ? CableProfile(port: port, contract: contract) : nil
+    }
+
     public init(port: PortInfo, contract: PDContract?) {
         self.port = port
         self.contract = contract

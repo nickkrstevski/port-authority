@@ -53,9 +53,16 @@ final class AppModel: ObservableObject {
 
     func start() {
         refresh(force: true)
-        timer = Timer.scheduledTimer(withTimeInterval: fastInterval, repeats: true) { [weak self] _ in
+
+        // Must be registered in .common modes. A scheduled timer only runs in
+        // the default run loop mode, and opening the menu bar panel puts the
+        // run loop into event tracking -- so the wattage froze for exactly as
+        // long as the user was looking at it.
+        let ticker = Timer(timeInterval: fastInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refresh(force: false) }
         }
+        RunLoop.main.add(ticker, forMode: .common)
+        timer = ticker
     }
 
     func stop() {

@@ -17,7 +17,7 @@ struct BrickView: View {
         }
         .padding(.horizontal, 11)
         .padding(.vertical, 10)
-        .frame(width: 168, alignment: .leading)
+        .frame(width: 170, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 11, style: .continuous)
                 .fill(Color.black.opacity(0.26))
@@ -96,7 +96,7 @@ struct PassiveEndView: View {
         }
         .padding(.horizontal, 11)
         .padding(.vertical, 10)
-        .frame(width: 168, alignment: .leading)
+        .frame(width: 170, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 11, style: .continuous)
                 .strokeBorder(
@@ -123,7 +123,7 @@ struct EmptyEndView: View {
         }
         .padding(.horizontal, 11)
         .padding(.vertical, 10)
-        .frame(width: 168, alignment: .leading)
+        .frame(width: 170, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 11, style: .continuous)
                 .strokeBorder(Theme.idle, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))

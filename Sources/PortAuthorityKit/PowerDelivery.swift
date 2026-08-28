@@ -139,6 +139,37 @@ public struct PDContract: Codable, Sendable, Equatable {
         }
     }
 
+    /// Negotiated voltage, when the contract is on a fixed supply.
+    public var contractVolts: Double? {
+        guard let activePDO else { return nil }
+        switch activePDO {
+        case .fixed(let volts, _, _, _): return volts
+        case .programmable(_, let maxVolts, _): return maxVolts
+        case .adjustable(_, let maxVolts, _): return maxVolts
+        case .variable(_, let maxVolts, _): return maxVolts
+        case .battery(_, let maxVolts, _): return maxVolts
+        }
+    }
+
+    public var contractAmps: Double? { request?.operatingAmps }
+
+    /// True when the source advertises Extended Power Range, i.e. above 100W.
+    public var supportsEPR: Bool {
+        sourceCapabilities.contains { pdo in
+            if case .fixed(_, _, _, let epr) = pdo { return epr }
+            if case .adjustable = pdo { return true }
+            return false
+        }
+    }
+
+    /// A source on mains rather than running off its own battery.
+    public var unconstrainedPower: Bool {
+        sourceCapabilities.contains { pdo in
+            if case .fixed(_, _, let unconstrained, _) = pdo { return unconstrained }
+            return false
+        }
+    }
+
     public var advertisedWatts: Double? {
         sourceCapabilities.map(\.maxWatts).max()
     }

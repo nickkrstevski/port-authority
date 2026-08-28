@@ -1,138 +1,163 @@
 import PortAuthorityKit
 import SwiftUI
 
-/// Shading helpers shared by the plug and the cable.
+/// Shading for objects seen from directly above.
 ///
-/// Everything here is drawn looking straight down at a round-ish object lying
-/// horizontally, so the form is conveyed by a gradient running across the
-/// band (top edge in shadow, specular highlight above centre, underside
-/// falling off to dark). Gradients along the length would read as flat.
+/// A USB-C plug is a flattened body, so from above most of what you see is a
+/// broad, nearly flat top face with the form falling away only near the two
+/// long edges. The gradient therefore holds a wide bright plateau through the
+/// middle and darkens late. Narrow highlights with heavy falloff read as a
+/// circular tube seen side-on, which is the wrong view entirely.
 enum Material {
-    static func cylinder(_ base: Color, specular: Double = 0.75) -> LinearGradient {
+    static func topFace(_ base: Color, specular: Double = 0.70) -> LinearGradient {
         LinearGradient(
             stops: [
-                .init(color: base.opacity(0.55), location: 0.00),
-                .init(color: base.opacity(0.88), location: 0.10),
-                .init(color: Color.white.opacity(specular), location: 0.26),
-                .init(color: base, location: 0.46),
-                .init(color: base.opacity(0.72), location: 0.70),
-                .init(color: Color.black.opacity(0.45), location: 0.93),
-                .init(color: Color.black.opacity(0.62), location: 1.00),
+                .init(color: base.opacity(0.50), location: 0.00),
+                .init(color: base.opacity(0.86), location: 0.09),
+                .init(color: Color.white.opacity(specular), location: 0.21),
+                .init(color: base, location: 0.34),
+                .init(color: base.opacity(0.95), location: 0.62),
+                .init(color: base.opacity(0.66), location: 0.82),
+                .init(color: Color.black.opacity(0.34), location: 0.94),
+                .init(color: Color.black.opacity(0.55), location: 1.00),
             ],
             startPoint: .top, endPoint: .bottom
         )
     }
 
-    /// Moulded cable and housing: Apple's are white, and a light neutral
-    /// reads correctly against both panel backgrounds.
-    static let shell = Color(white: 0.80)
-    /// The metal receptacle shell, cooler and brighter than the plastic.
-    static let steel = Color(red: 0.70, green: 0.72, blue: 0.75)
+    static let shell = Color(white: 0.82)
+    static let steel = Color(red: 0.71, green: 0.73, blue: 0.76)
+    static let aluminium = Color(red: 0.55, green: 0.57, blue: 0.60)
 }
 
-/// A plug seen from directly above: contact shell at the left pointing into
-/// the machine, housing, then strain relief tapering into the cable.
+/// Real plug dimensions in millimetres, rendered at a fixed scale.
 ///
-/// Proportions follow the real connector. On USB-C the shell is 8.34mm across
-/// against a ~12mm housing and a ~4mm cable, so from above the shell is nearly
-/// as wide as the housing while the cable is markedly thinner. (Those same
-/// parts in side elevation would be 2.56mm, 6mm and 4mm -- a much flatter
-/// shape with a comparatively fat cable.)
+/// Getting these right is what separates the two views. Seen from above a
+/// USB-C plug is 8.34mm shell / 12mm housing / 4mm cable, so the shell is
+/// nearly as wide as the housing and the cable is a third of it. The same
+/// parts in side elevation are 2.56 / 6 / 4, where the cable is two thirds of
+/// the housing and the shell is a thin lip. Cable-to-housing ratio is the
+/// single strongest cue for which view the reader is looking at.
+struct PlugMetrics {
+    var shellAcross: CGFloat
+    var shellLong: CGFloat
+    var shellRadius: CGFloat
+    var housingAcross: CGFloat
+    var housingLong: CGFloat
+    var reliefLong: CGFloat
+
+    static let scale: CGFloat = 2.5
+
+    static func forKind(_ kind: PortKind) -> PlugMetrics {
+        switch kind {
+        case .magSafe:
+            // The MagSafe head is the widest part and much shorter than a
+            // USB-C shell; it sits proud of the housing behind it.
+            return PlugMetrics(
+                shellAcross: 15.0 * scale, shellLong: 8.5 * scale, shellRadius: 2.0 * scale,
+                housingAcross: 11.5 * scale, housingLong: 15.0 * scale,
+                reliefLong: 6.0 * scale
+            )
+        case .usbC, .unknown:
+            return PlugMetrics(
+                shellAcross: 8.34 * scale, shellLong: 6.5 * scale, shellRadius: 1.0 * scale,
+                housingAcross: 12.0 * scale, housingLong: 17.5 * scale,
+                reliefLong: 7.0 * scale
+            )
+        }
+    }
+
+    /// Cable diameter for the gauge, in the same scale.
+    static func cableAcross(heavyGauge: Bool) -> CGFloat {
+        (heavyGauge ? 4.8 : 4.0) * scale
+    }
+}
+
+/// A plug seen from directly above, as it sits when plugged into the side of
+/// an open laptop and you look straight down at the keyboard plane.
 struct TopDownPlug: View {
     let kind: PortKind
     let orientation: PlugOrientation
     let energised: Bool
     var dimmed: Bool = false
 
-    /// Full width of the housing across the view; everything else is
-    /// proportional to it.
-    private var housingWidth: CGFloat { kind == .magSafe ? 34 : 30 }
+    private var metrics: PlugMetrics { .forKind(kind) }
 
     var body: some View {
-        HStack(spacing: -4) {
+        HStack(spacing: -3) {
             shell
             housing.zIndex(2)
             strainRelief.zIndex(1)
         }
-        .frame(height: 38)
-        .shadow(color: .black.opacity(dimmed ? 0.15 : 0.45), radius: 3.5, x: 0, y: 2.5)
+        .frame(height: 42)
+        .shadow(color: .black.opacity(dimmed ? 0.14 : 0.42), radius: 3.5, x: 0, y: 3)
         .saturation(dimmed ? 0 : 1)
         .opacity(dimmed ? 0.4 : 1)
     }
 
-    // MARK: shell
-
     private var shell: some View {
-        let across = housingWidth * (kind == .magSafe ? 1.0 : 0.70)
-        let length: CGFloat = kind == .magSafe ? 17 : 25
-
-        return RoundedRectangle(cornerRadius: kind == .magSafe ? 3 : 2.5, style: .continuous)
-            .fill(Material.cylinder(Material.steel, specular: 0.9))
+        RoundedRectangle(cornerRadius: metrics.shellRadius, style: .continuous)
+            .fill(Material.topFace(Material.steel, specular: 0.88))
             .overlay(
-                // The fold seam that runs the length of a drawn metal shell.
+                // Seam along the drawn metal shell.
                 Rectangle()
-                    .fill(Color.black.opacity(0.16))
+                    .fill(Color.black.opacity(0.15))
                     .frame(height: 0.75)
-                    .offset(y: -across * 0.17)
+                    .offset(y: -metrics.shellAcross * 0.16)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: kind == .magSafe ? 3 : 2.5, style: .continuous)
-                    .strokeBorder(Color.black.opacity(0.30), lineWidth: 0.6)
+                RoundedRectangle(cornerRadius: metrics.shellRadius, style: .continuous)
+                    .strokeBorder(Color.black.opacity(0.28), lineWidth: 0.6)
             )
-            .frame(width: length, height: across)
-            .shadow(color: energised ? Theme.live.opacity(0.55) : .clear, radius: 6)
+            .frame(width: metrics.shellLong, height: metrics.shellAcross)
+            .shadow(color: energised ? Theme.live.opacity(0.5) : .clear, radius: 6)
     }
-
-    // MARK: housing
 
     private var housing: some View {
         ZStack(alignment: orientation == .flipped ? .bottom : .top) {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(Material.cylinder(Material.shell))
+            RoundedRectangle(cornerRadius: 5.5, style: .continuous)
+                .fill(Material.topFace(Material.shell))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .strokeBorder(Color.black.opacity(0.22), lineWidth: 0.6)
+                    RoundedRectangle(cornerRadius: 5.5, style: .continuous)
+                        .strokeBorder(Color.black.opacity(0.20), lineWidth: 0.6)
                 )
 
-            // Orientation cannot be seen from above on a real connector, so
-            // it is marked rather than faked: the pip sits on whichever face
-            // is currently up.
+            // Orientation is genuinely invisible from above, so it is marked
+            // rather than faked: the pip sits on whichever face is up.
             if orientation != .unknown {
                 Capsule()
-                    .fill(energised ? Theme.live : Color.black.opacity(0.28))
+                    .fill(energised ? Theme.live : Color.black.opacity(0.26))
                     .frame(width: 13, height: 3)
                     .padding(.vertical, 4.5)
             }
         }
-        .frame(width: kind == .magSafe ? 34 : 42, height: housingWidth)
+        .frame(width: metrics.housingLong, height: metrics.housingAcross)
     }
-
-    // MARK: strain relief
 
     private var strainRelief: some View {
-        Taper(leadingAcross: housingWidth * 0.78, trailingAcross: housingWidth * 0.44)
-            .fill(Material.cylinder(Material.shell, specular: 0.6))
-            .overlay(ribs)
-            .frame(width: 17, height: housingWidth)
+        Taper(
+            leadingAcross: metrics.housingAcross * 0.76,
+            trailingAcross: PlugMetrics.cableAcross(heavyGauge: false) + 2
+        )
+        .fill(Material.topFace(Material.shell, specular: 0.58))
+        .overlay(ribs)
+        .frame(width: metrics.reliefLong, height: metrics.housingAcross)
     }
 
-    /// Moulded relief rings, which is what makes this section read as flexible
-    /// rather than as more housing.
     private var ribs: some View {
         GeometryReader { geometry in
-            let inset: CGFloat = 3
             ForEach(0..<3, id: \.self) { index in
-                let x = inset + CGFloat(index) * ((geometry.size.width - inset * 2) / 3)
+                let step = (geometry.size.width - 5) / 3
                 Capsule()
-                    .fill(Color.black.opacity(0.16))
-                    .frame(width: 1.4, height: geometry.size.height * (0.62 - CGFloat(index) * 0.06))
-                    .position(x: x, y: geometry.size.height / 2)
+                    .fill(Color.black.opacity(0.15))
+                    .frame(width: 1.3, height: geometry.size.height * (0.58 - CGFloat(index) * 0.07))
+                    .position(x: 3 + CGFloat(index) * step, y: geometry.size.height / 2)
             }
         }
     }
 }
 
-/// A symmetric taper, used for the strain relief between housing and cable.
+/// A symmetric taper, used between housing and cable.
 struct Taper: Shape {
     var leadingAcross: CGFloat
     var trailingAcross: CGFloat
@@ -151,34 +176,54 @@ struct Taper: Shape {
     }
 }
 
-/// The machine's edge, seen from above: the plug disappears into it.
-struct ChassisEdge: View {
+/// The laptop, seen from above: its top case fills the left of the diagram and
+/// runs off the edge of the panel, with the port cut into its outer wall.
+///
+/// The previous version was a narrow vertical bar, which reads as an edge seen
+/// side-on and made the whole scene look like a side elevation regardless of
+/// how the plug was drawn.
+struct MachineBody: View {
+    let portKind: PortKind
     var dimmed: Bool = false
 
+    private var slotAcross: CGFloat {
+        PlugMetrics.forKind(portKind).shellAcross + 2
+    }
+
     var body: some View {
-        UnevenRoundedRectangle(
-            topLeadingRadius: 6, bottomLeadingRadius: 6,
-            bottomTrailingRadius: 2, topTrailingRadius: 2,
-            style: .continuous
-        )
-        .fill(
-            LinearGradient(
-                colors: [
-                    Theme.metal.opacity(0.20),
-                    Theme.metal.opacity(0.48),
-                    Theme.metal.opacity(0.26),
-                ],
-                startPoint: .top, endPoint: .bottom
+        ZStack(alignment: .trailing) {
+            UnevenRoundedRectangle(
+                topLeadingRadius: 0, bottomLeadingRadius: 0,
+                bottomTrailingRadius: 9, topTrailingRadius: 9,
+                style: .continuous
             )
-        )
-        .overlay(
-            // Lip of the port opening.
-            Rectangle()
-                .fill(Color.black.opacity(0.35))
-                .frame(width: 1)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-        )
-        .frame(width: 17, height: 62)
-        .opacity(dimmed ? 0.45 : 1)
+            .fill(
+                LinearGradient(
+                    stops: [
+                        .init(color: Material.aluminium.opacity(0.30), location: 0.00),
+                        .init(color: Material.aluminium.opacity(0.52), location: 0.30),
+                        .init(color: Material.aluminium.opacity(0.44), location: 0.72),
+                        .init(color: Material.aluminium.opacity(0.22), location: 1.00),
+                    ],
+                    startPoint: .top, endPoint: .bottom
+                )
+            )
+
+            // Chamfered outer edge catching the light.
+            UnevenRoundedRectangle(
+                topLeadingRadius: 0, bottomLeadingRadius: 0,
+                bottomTrailingRadius: 9, topTrailingRadius: 9,
+                style: .continuous
+            )
+            .strokeBorder(Color.white.opacity(0.22), lineWidth: 1)
+
+            // The port cut into the outer wall, mostly hidden by the plug.
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(Color.black.opacity(0.62))
+                .frame(width: 8, height: slotAcross)
+                .offset(x: 1)
+        }
+        .frame(width: 40, height: 84)
+        .opacity(dimmed ? 0.5 : 1)
     }
 }

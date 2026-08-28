@@ -67,8 +67,17 @@ public enum AdapterReader {
         // (just a FamilyCode), so presence alone is not a connection test.
         let rated = details?["Watts"] as? Double ?? (details?["Watts"] as? Int).map(Double.init)
 
+        // Prefer the SMC sensor: it moves every second, where IOKit's
+        // AdapterPower can sit unchanged for ten seconds at a time. Fall back
+        // to IOKit when the SMC is unavailable.
+        let measured = SMCReader.adapterInputWatts()
+            ?? batteryData?["AdapterPower"] as? Double
+        // Below half a watt means nothing is attached; reporting "0 W" instead
+        // of "on battery" would be misleading.
+        let liveWatts = (measured ?? 0) > 0.5 ? measured : nil
+
         return AdapterState(
-            adapterWatts: batteryData?["AdapterPower"] as? Double,
+            adapterWatts: liveWatts,
             systemWatts: batteryData?["SystemPower"] as? Double,
             ratedWatts: rated,
             voltageMillivolts: details?["AdapterVoltage"] as? Int,

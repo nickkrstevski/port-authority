@@ -119,19 +119,70 @@ struct ContentView: View {
     @ViewBuilder
     private func details(for snapshot: PortSnapshot) -> some View {
         let port = snapshot.port
-        VStack(alignment: .leading, spacing: 5) {
-            if port.connected {
-                detailRow("Orientation", port.orientation == .flipped ? "Flipped" : "Normal")
-                detailRow("Cable", cableDescription(snapshot))
-                if !port.transportsActive.isEmpty {
-                    detailRow("Transports", port.transportsActive.joined(separator: " · "))
+        if port.connected {
+            VStack(alignment: .leading, spacing: 10) {
+                if let cable = snapshot.cable { cableSection(cable, port: port) }
+                if let contract = snapshot.contract {
+                    contractSection(contract, liveWatts: liveWatts(for: snapshot))
                 }
-                if let contract = snapshot.contract, let watts = contract.contractWatts {
-                    detailRow("Contract", "\(Watts.short(watts))W ceiling")
-                }
-                if snapshot.contract?.supportsPPS == true {
-                    detailRow("PPS", "Supported")
-                }
+                portSection(port)
+            }
+        }
+    }
+
+    private func cableSection(_ cable: CableProfile, port: PortInfo) -> some View {
+        section("Cable") {
+            detailRow("Construction", cable.construction.rawValue)
+            if let rating = cable.currentRatingLabel {
+                // Say plainly that this is deduced: a sink never reads the
+                // cable's e-marker, so this is a floor, not a nameplate.
+                detailRow("Current rating", rating, note: cable.ratingInferred ? "from contract" : nil)
+            }
+            detailRow("Data", cable.data.rawValue)
+            if cable.activeLanes > 0 {
+                detailRow("High-speed lanes", "\(cable.activeLanes) of 4")
+            }
+            detailRow("Orientation", port.orientation == .flipped ? "Flipped" : "Normal")
+            if cable.carriesDisplay {
+                detailRow("DisplayPort", cable.displayAttached ? "Display attached" : "Capable")
+            }
+        }
+    }
+
+    private func contractSection(_ contract: PDContract, liveWatts: Double?) -> some View {
+        section("Contract") {
+            if let volts = contract.contractVolts, let amps = contract.contractAmps {
+                detailRow("Negotiated", "\(trimmed(volts))V · \(trimmed(amps))A")
+            }
+            if let ceiling = contract.contractWatts {
+                detailRow("Ceiling", "\(Watts.short(ceiling))W")
+            }
+            if let liveWatts, let volts = contract.contractVolts, volts > 0 {
+                detailRow("Drawing", "\(Watts.short(liveWatts))W · \(trimmed(liveWatts / volts))A")
+            }
+            detailRow("Profiles offered", "\(contract.sourceCapabilities.count)")
+            let features = [
+                contract.supportsPPS ? "PPS" : nil,
+                contract.supportsEPR ? "EPR" : nil,
+                contract.unconstrainedPower ? "Mains" : nil,
+            ].compactMap { $0 }
+            if !features.isEmpty {
+                detailRow("Supports", features.joined(separator: " · "))
+            }
+            if contract.request?.capabilityMismatch == true {
+                detailRow("Warning", "Capability mismatch")
+            }
+        }
+    }
+
+    private func portSection(_ port: PortInfo) -> some View {
+        section("Port") {
+            if !port.transportsActive.isEmpty {
+                detailRow("Active", port.transportsActive.joined(separator: " · "))
+            }
+            detailRow("Connections", "\(port.connectionCount)")
+            if port.overcurrentCount > 0 {
+                detailRow("Overcurrent events", "\(port.overcurrentCount)")
             }
             if port.liquidDetected == true {
                 detailRow("Liquid", "Detected")
@@ -139,23 +190,32 @@ struct ContentView: View {
         }
     }
 
-    /// The registry's ActiveCable flag distinguishes active cables from
-    /// passive ones; it is not an e-marker test. A passive cable carrying
-    /// more than 3A must be e-marked, so we infer that from the contract
-    /// rather than claiming to have read the e-marker itself.
-    private func cableDescription(_ snapshot: PortSnapshot) -> String {
-        var parts: [String] = [snapshot.port.activeCable ? "Active" : "Passive"]
-        if snapshot.port.opticalCable { parts.append("optical") }
-        if let amps = snapshot.contract?.request?.operatingAmps, amps > 3.0 {
-            parts.append("e-marked (>3A)")
-        }
-        return parts.joined(separator: ", ")
+    private func trimmed(_ value: Double) -> String {
+        value == value.rounded() ? String(Int(value)) : String(format: "%.1f", value)
     }
 
-    private func detailRow(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .top) {
+    @ViewBuilder
+    private func section<Content: View>(
+        _ title: String, @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title.uppercased())
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(.tertiary)
+                .tracking(0.6)
+            content()
+        }
+    }
+
+    private func detailRow(_ label: String, _ value: String, note: String? = nil) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(label).readout(10).foregroundStyle(.secondary)
-            Spacer()
+            Spacer(minLength: 0)
+            if let note {
+                Text(note)
+                    .font(.system(size: 8.5))
+                    .foregroundStyle(.tertiary)
+            }
             Text(value).readout(10).multilineTextAlignment(.trailing)
         }
     }
@@ -193,7 +253,7 @@ struct ConnectionDiagram: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
-            ChassisEdge(dimmed: !connected)
+            MachineBody(portKind: snapshot.port.kind, dimmed: !connected)
 
             if !connected { Spacer().frame(width: 14) }
 
@@ -213,13 +273,14 @@ struct ConnectionDiagram: View {
                 heavyGauge: (snapshot.contract?.request?.operatingAmps ?? 0) > 3.0,
                 dimmed: !connected
             )
-            .frame(minWidth: 34)
+            .frame(minWidth: 30)
             .layoutPriority(1)
 
             endpoint
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 6)
+        .padding(.leading, -15)
         .animation(.easeInOut(duration: 0.25), value: connected)
     }
 
