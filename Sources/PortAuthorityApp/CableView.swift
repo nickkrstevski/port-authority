@@ -53,7 +53,7 @@ struct CableView: View {
     /// Drawn additively so it reads as light within the cable rather than
     /// as markings painted on top of it.
     private func flow(width: CGFloat) -> some View {
-        let spacing: CGFloat = 20
+        let spacing: CGFloat = 34
         let count = max(2, Int(width / spacing) + 2)
         let speed = 1.0 + intensity * 1.7
 
@@ -62,18 +62,18 @@ struct CableView: View {
             let phase = CGFloat((time * speed).truncatingRemainder(dividingBy: 1)) * spacing
 
             Canvas { context, size in
-                context.addFilter(.blur(radius: 2.6))
+                context.addFilter(.blur(radius: 3.4))
                 for index in 0..<count {
                     let x = width - (CGFloat(index) * spacing - phase)
                     guard x > -spacing, x < width + spacing else { continue }
-                    let height = thickness * 0.34
+                    let height = thickness * 0.22
                     let rect = CGRect(
-                        x: x - 4, y: size.height / 2 - height / 2,
-                        width: 8, height: height
+                        x: x - 9, y: size.height / 2 - height / 2,
+                        width: 18, height: height
                     )
                     context.fill(
                         Capsule().path(in: rect),
-                        with: .color(Theme.live.opacity(0.30 + intensity * 0.34))
+                        with: .color(Theme.live.opacity(0.16 + intensity * 0.16))
                     )
                 }
             }

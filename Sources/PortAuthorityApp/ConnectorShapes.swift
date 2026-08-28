@@ -20,7 +20,7 @@ enum Material {
     /// A dark cable would be blown out by the same highlight that a white one
     /// needs, so gloss scales with the base.
     static func gloss(_ scheme: ColorScheme) -> Double {
-        scheme == .dark ? 0.70 : 0.40
+        scheme == .dark ? 0.34 : 0.20
     }
 
     /// Edge shading. On a pale cable the form is described by darkening the
@@ -95,7 +95,7 @@ struct PlugMetrics {
     var housingLong: CGFloat
     var reliefLong: CGFloat
 
-    static let scale: CGFloat = 2.5
+    static let scale: CGFloat = 3.4
 
     static func forKind(_ kind: PortKind) -> PlugMetrics {
         switch kind {
@@ -156,7 +156,7 @@ struct TopDownPlug: View {
                 }
             }
         }
-        .frame(height: 42)
+        .frame(height: 56)
         .shadow(color: .black.opacity(dimmed ? 0.14 : 0.42), radius: 3.5, x: 0, y: 3)
         .saturation(dimmed ? 0 : 1)
         .opacity(dimmed ? 0.4 : 1)
@@ -171,7 +171,7 @@ struct TopDownPlug: View {
         let tip = metrics.shellAcross
         // The real wedge narrows toward the braid but does not come to a
         // point; too much taper reads as a funnel.
-        let tail = PlugMetrics.cableAcross(heavyGauge: false) + 5.5
+        let tail = tip * 0.62
 
         return ZStack(alignment: .leading) {
             Taper(leadingAcross: tip, trailingAcross: tail)
@@ -181,11 +181,21 @@ struct TopDownPlug: View {
                         .stroke(Color.black.opacity(0.30), lineWidth: 0.7)
                 )
 
-            // Rounded bezel around the contact face at the tip.
-            RoundedRectangle(cornerRadius: 1.6, style: .continuous)
-                .strokeBorder(Color.black.opacity(0.28), lineWidth: 0.9)
-                .frame(width: 3, height: tip - 2)
-                .padding(.leading, 1)
+            // The recessed contact face, with its row of pins.
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(Color.black.opacity(0.30))
+                .frame(width: 5, height: tip - 5)
+                .overlay(
+                    HStack(spacing: 1.4) {
+                        ForEach(0..<5, id: \.self) { _ in
+                            Capsule()
+                                .fill(Theme.contact.opacity(0.9))
+                                .frame(width: 1.4, height: 1.4)
+                        }
+                    }
+                    .rotationEffect(.degrees(90))
+                )
+                .padding(.leading, 1.5)
 
             // The status LED, which sits on the top face near the tip.
             Circle()
@@ -305,10 +315,9 @@ struct MachineBody: View {
             .fill(
                 LinearGradient(
                     stops: [
-                        .init(color: Material.aluminium.opacity(0.24), location: 0.00),
-                        .init(color: Material.aluminium.opacity(0.50), location: 0.40),
-                        .init(color: Material.aluminium.opacity(0.40), location: 0.78),
-                        .init(color: Material.aluminium.opacity(0.22), location: 1.00),
+                        .init(color: Material.aluminium.opacity(0.62), location: 0.00),
+                        .init(color: Material.aluminium.opacity(0.78), location: 0.55),
+                        .init(color: Material.aluminium.opacity(0.66), location: 1.00),
                     ],
                     startPoint: .leading, endPoint: .trailing
                 )
@@ -330,13 +339,13 @@ struct MachineBody: View {
                 .frame(width: 3.5, height: slotAcross)
                 .offset(x: 1.5)
         }
-        .frame(width: 40, height: 132)
+        .frame(width: 46, height: 150)
         .mask(
             LinearGradient(
                 stops: [
                     .init(color: .clear, location: 0.00),
-                    .init(color: .black, location: 0.30),
-                    .init(color: .black, location: 0.70),
+                    .init(color: .black, location: 0.13),
+                    .init(color: .black, location: 0.87),
                     .init(color: .clear, location: 1.00),
                 ],
                 startPoint: .top, endPoint: .bottom
