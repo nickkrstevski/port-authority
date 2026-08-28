@@ -12,9 +12,8 @@ struct ContentView: View {
     private var showChart: Bool { model.showChart }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            summary
-            portPicker
+        VStack(alignment: .leading, spacing: 12) {
+            header
             if let selected = model.selectedPort {
                 ConnectionDiagram(
                     snapshot: selected,
@@ -29,7 +28,7 @@ struct ContentView: View {
                 // window mid-constraint-pass, which AppKit answers with an
                 // exception. Holding this region's height constant means the
                 // panel never has to resize, so that path is never taken.
-                ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 0) {
                     if showChart {
                         PowerChart(
                             trace: model.trace(for: selected.id) ?? PowerTrace(),
@@ -38,14 +37,51 @@ struct ContentView: View {
                     } else {
                         details(for: selected)
                     }
+                    Spacer(minLength: 0)
                 }
-                .frame(height: selected.port.connected ? 246 : 0)
-                .scrollBounceBehavior(.basedOnSize)
+                .frame(height: selected.port.connected ? 250 : 0, alignment: .top)
+                .clipped()
             }
             footer
         }
         .padding(15)
         .frame(width: Theme.panelWidth)
+    }
+
+    /// Readouts on the left, the machine on the right. Side by side rather
+    /// than stacked: the panel is tall enough already.
+    private var header: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 9) {
+                summary
+                if model.adapter.adapterWatts != nil { powerSplit }
+                selectedPortSummary
+            }
+            Spacer(minLength: 0)
+            MachineMap(
+                ports: model.ports,
+                selectedID: model.selectedPort?.id,
+                onSelect: { model.select(portID: $0) }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var selectedPortSummary: some View {
+        if let selected = model.selectedPort {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(shortName(selected.port))
+                    .font(.system(size: 12, weight: .semibold))
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(selected.port.connected ? Theme.live : Theme.idle)
+                        .frame(width: 5, height: 5)
+                    Text("\(selected.port.location.label) · \(selected.port.connected ? "Connected" : "Empty")")
+                        .readout(10)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
     }
 
     /// Live wattage is machine-wide, not per-port, so only attribute it to a
@@ -56,22 +92,18 @@ struct ContentView: View {
     }
 
     private var summary: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Port Authority")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                if let watts = model.adapter.adapterWatts, watts > 0.5 {
-                    HStack(alignment: .firstTextBaseline, spacing: 3) {
-                        Text(Watts.short(watts)).readout(27, weight: .semibold)
-                        Text("W").readout(13).foregroundStyle(.secondary)
-                    }
-                } else {
-                    Text("On battery").readout(17).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 1) {
+            Text("Port Authority")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+            if let watts = model.adapter.adapterWatts, watts > 0.5 {
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    Text(Watts.short(watts)).readout(27, weight: .semibold)
+                    Text("W").readout(13).foregroundStyle(.secondary)
                 }
+            } else {
+                Text("On battery").readout(17).foregroundStyle(.secondary)
             }
-            Spacer()
-            if model.adapter.adapterWatts != nil { powerSplit }
         }
     }
 
@@ -82,7 +114,7 @@ struct ContentView: View {
         let battery = model.adapter.batteryWatts ?? 0
         let total = max(system + battery, 0.001)
 
-        return VStack(alignment: .trailing, spacing: 4) {
+        return VStack(alignment: .leading, spacing: 4) {
             GeometryReader { geometry in
                 HStack(spacing: 2) {
                     Capsule().fill(Theme.live)
@@ -103,37 +135,6 @@ struct ContentView: View {
         HStack(spacing: 3) {
             Circle().fill(color).frame(width: 5, height: 5)
             Text("\(name) \(value)").readout(9).foregroundStyle(.secondary)
-        }
-    }
-
-    /// The machine with its real port layout, alongside a description of
-    /// whichever port is selected.
-    private var portPicker: some View {
-        HStack(alignment: .center, spacing: 15) {
-            MachineMap(
-                ports: model.ports,
-                selectedID: model.selectedPort?.id,
-                onSelect: { model.select(portID: $0) }
-            )
-
-            if let selected = model.selectedPort {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(shortName(selected.port))
-                        .font(.system(size: 12, weight: .semibold))
-                    Text(selected.port.location.label)
-                        .readout(10)
-                        .foregroundStyle(.secondary)
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(selected.port.connected ? Theme.live : Theme.idle)
-                            .frame(width: 5, height: 5)
-                        Text(selected.port.connected ? "Connected" : "Empty")
-                            .readout(10)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            Spacer(minLength: 0)
         }
     }
 
@@ -325,6 +326,9 @@ struct ConnectionDiagram: View {
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
             MachineBody(portKind: snapshot.port.kind, dimmed: !connected)
+                // Drawn above the plug so the shell disappears into the port
+                // rather than lying across the chassis.
+                .zIndex(1)
 
             if !connected { Spacer().frame(width: 14) }
 
@@ -338,6 +342,10 @@ struct ConnectionDiagram: View {
                 dimmed: !connected,
                 heavyGauge: heavyGauge
             )
+            // A seated connector has its whole contact shell inside the
+            // machine: only the housing shows, butted against the chassis.
+            // Unplugged, the shell is visible because it is out in the air.
+            .padding(.leading, connected ? -PlugMetrics.forKind(snapshot.port.kind).shellLong : 0)
 
             CableView(
                 energised: energised,
